@@ -9,6 +9,9 @@ const navItems = [
   { to: "/profile", label: "Tài khoản" },
 ];
 
+// Check if user is admin (mock - replace with actual role check)
+const isAdmin = localStorage.getItem('userRole') === 'ADMIN';
+
 export default function Sidebar() {
   return (
     <aside className="sidebar">
@@ -30,6 +33,21 @@ export default function Sidebar() {
             <span aria-hidden>→</span>
           </NavLink>
         ))}
+        
+        {isAdmin && (
+          <>
+            <div className="nav-divider"></div>
+            <NavLink
+              to="/admin/dashboard"
+              className={({ isActive }) =>
+                isActive ? "nav-link active admin-link" : "nav-link admin-link"
+              }
+            >
+              <span>⚙️ Admin</span>
+              <span aria-hidden>→</span>
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="sidebar__card">
