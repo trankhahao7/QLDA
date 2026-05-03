@@ -1,0 +1,166 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.login-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+/* LEFT SIDE - HERO */
+.login-left {
+  flex: 1.2;
+  background: url("https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80")
+    no-repeat center;
+  background-size: cover;
+  position: relative;
+  /* Đảm bảo màu mặc định là trắng */
+  color: #ffffff; 
+}
+
+.login-left .overlay {
+  background: linear-gradient(135deg, rgba(0, 120, 212, 0.85), rgba(0, 0, 0, 0.75));
+  height: 100%;
+  padding: 5% 10%;
+  display: flex;
+  align-items: center;
+}
+
+/* Ép toàn bộ chữ bên trong sang màu trắng */
+.login-left h1, 
+.login-left h1 span, 
+.login-left p, 
+.login-left .badge,
+.login-left .feature-card p,
+.login-left .feature-card .icon {
+  color: #ffffff !important;
+}
+
+.login-left h1 {
+  font-size: clamp(32px, 3vw, 56px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 24px;
+}
+
+.login-left p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  opacity: 0.95; /* Tăng độ đậm của chữ trắng */
+  margin-bottom: 40px;
+}
+
+.badge {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 10px 24px;
+  border-radius: 50px;
+  display: inline-block;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* FEATURE CARDS - Chữ trắng trên nền mờ */
+.feature-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-5px);
+}
+
+/* RIGHT SIDE - LOGIN */
+.login-right {
+  flex: 0.8;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #ffffff;
+  padding: 40px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 450px; /* Tăng độ rộng hộp thoại */
+  padding: 60px 40px;
+  text-align: center;
+  transition: all 0.4s ease;
+}
+
+.logo-placeholder {
+  margin-bottom: 30px;
+}
+
+.logo-placeholder img {
+  width: 80px;
+  height: 80px;
+}
+
+.login-card h2 {
+  font-size: 28px;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.login-card p {
+  color: #666;
+  font-size: 15px;
+  margin-bottom: 40px;
+}
+
+/* OFFICE BUTTON */
+.office-btn {
+  width: 100%;
+  padding: 18px;
+  font-size: 17px;
+  font-weight: 600;
+  border: 1px solid #e1e1e1;
+  border-radius: 12px;
+  background: white;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+}
+
+.office-btn:hover {
+  background: #f8f9fa;
+  border-color: #0078d4;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+}
+
+.office-btn img {
+  width: 28px;
+}
+
+.login-footer {
+  margin-top: 50px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .login-left { display: none; }
+  .login-right { flex: 1; }
+}
