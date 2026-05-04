@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
+import { createIncomingDocument, uploadAttachment } from "../../services/documents/documentsApi";
 
 interface UploadForm {
   title: string;
@@ -9,6 +12,7 @@ interface UploadForm {
 }
 
 export default function Upload() {
+  const [documentTypes, setDocumentTypes] = useState<Array<{ id: number; maLoaiVanBan: string; tenLoaiVanBan: string }>>([]);
   const [form, setForm] = useState<UploadForm>({
     title: "",
     type: "CONG_VAN",
@@ -20,11 +24,45 @@ export default function Upload() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
 
+  useEffect(() => {
+    const loadDocumentTypes = async () => {
+      try {
+        const data = await fetchDocumentTypes({});
+        setDocumentTypes(data || []);
+      } catch (error) {
+        console.error("Error loading document types:", error);
+      }
+    };
+
+    loadDocumentTypes();
+  }, []);
+
+  const selectedLoaiVanBanId = useMemo(() => {
+    const type = documentTypes.find((item) => item.maLoaiVanBan === form.type);
+    return type?.id;
+  }, [documentTypes, form.type]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setMessage(null);
 
-    setTimeout(() => {
+    try {
+      if (!selectedLoaiVanBanId) {
+        throw new ApiError("Chưa chọn loại văn bản hợp lệ", 400);
+      }
+      const created = await createIncomingDocument({
+        trichYeu: form.title,
+        loaiVanBanId: selectedLoaiVanBanId,
+        donViBanHanh: form.department,
+        ngayVanBan: form.date,
+        ngayTiepNhan: form.date,
+      });
+
+      if (file) {
+        await uploadAttachment(created.id, file);
+      }
+
       setMessage({ type: "success", text: "Tải lên thành công!" });
       setForm({
         title: "",
@@ -34,8 +72,12 @@ export default function Upload() {
         description: "",
       });
       setFile(null);
+    } catch (err) {
+      const messageText = err instanceof ApiError ? err.message : "Tải lên thất bại";
+      setMessage({ type: "error", text: messageText });
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   return (
@@ -76,9 +118,14 @@ export default function Upload() {
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
-                <option value="CONG_VAN">Công văn</option>
-                <option value="BIEN_BAN">Biên bản</option>
-                <option value="DE_XUAT">Đề xuất</option>
+                {documentTypes.length === 0 && (
+                  <option value="CONG_VAN">Công văn</option>
+                )}
+                {documentTypes.map((type) => (
+                  <option key={type.id} value={type.maLoaiVanBan}>
+                    {type.tenLoaiVanBan}
+                  </option>
+                ))}
               </select>
             </label>
             <label>

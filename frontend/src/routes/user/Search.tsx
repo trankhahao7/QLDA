@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { searchIncomingDocuments } from "../../services/documents/documentSearchApi";
+import type { DocumentListItem } from "../../services/documents/documentsApi";
 import { Link } from "react-router-dom";
 
 interface VanBanTimKiem {
@@ -6,32 +9,9 @@ interface VanBanTimKiem {
   soKyHieu: string;
   trichYeu: string;
   donViBanHanh: string;
+  ngayTiepNhan: string;
   trangThai: string;
 }
-
-const danhSachMau: VanBanTimKiem[] = [
-  {
-    id: 21,
-    soKyHieu: "VB-021",
-    trichYeu: "Công văn bổ sung dự toán",
-    donViBanHanh: "Phòng Kế hoạch",
-    trangThai: "Chờ phê duyệt",
-  },
-  {
-    id: 18,
-    soKyHieu: "VB-018",
-    trichYeu: "Biên bản nghiệm thu giai đoạn 1",
-    donViBanHanh: "Tư vấn giám sát",
-    trangThai: "Đã hoàn tất",
-  },
-  {
-    id: 31,
-    soKyHieu: "VB-031",
-    trichYeu: "Công văn tham gia hội thảo",
-    donViBanHanh: "Sở Xây dựng",
-    trangThai: "Đang xử lý",
-  },
-];
 
 export default function Search() {
   const [keyword, setKeyword] = useState("");
@@ -40,29 +20,47 @@ export default function Search() {
   const [results, setResults] = useState<VanBanTimKiem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setSearched(true);
+    setError(null);
 
-    const keywordLower = keyword.trim().toLowerCase();
-    const ketQuaLoc = danhSachMau.filter((item) => {
-      const dungTuKhoa =
-        !keywordLower ||
-        item.trichYeu.toLowerCase().includes(keywordLower) ||
-        item.soKyHieu.toLowerCase().includes(keywordLower);
+    try {
+      // TODO: map donVi filter to donViChuTriId once UI uses unit IDs.
+      const response = await searchIncomingDocuments({
+        page: 0,
+        size: 20,
+        keyword: keyword || undefined,
+        trangThai: status ? Number(status) : undefined,
+      });
 
-      const dungDonVi = !donVi || item.donViBanHanh === donVi;
-      const dungTrangThai = !status || item.trangThai === status;
-
-      return dungTuKhoa && dungDonVi && dungTrangThai;
-    });
-
-    setTimeout(() => {
-      setResults(ketQuaLoc);
+        const statusLabels: Record<number, string> = {
+          1: "Đang xử lý",
+          2: "Hoàn thành",
+        };
+        setResults(
+          (response.content || []).map((item: DocumentListItem) => ({
+            id: item.id,
+            soKyHieu: item.soKyHieu || "-",
+            trichYeu: item.trichYeu,
+            donViBanHanh: item.donViBanHanh || "-",
+            ngayTiepNhan: item.ngayTiepNhan || "",
+            trangThai:
+              item.trangThai !== undefined
+                ? statusLabels[item.trangThai] || "-"
+                : "-",
+          }))
+        );
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Không thể tìm kiếm";
+      setError(message);
+      setResults([]);
+    } finally {
       setLoading(false);
-    }, 250);
+    }
   };
 
   return (
@@ -102,9 +100,8 @@ export default function Search() {
             Trạng thái
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">Tất cả</option>
-              <option value="Đang xử lý">Đang xử lý</option>
-              <option value="Chờ phê duyệt">Chờ phê duyệt</option>
-              <option value="Đã hoàn tất">Đã hoàn tất</option>
+              <option value="1">Đang xử lý</option>
+              <option value="2">Hoàn thành</option>
             </select>
           </label>
           <button className="button" type="submit" disabled={loading}>
@@ -120,6 +117,8 @@ export default function Search() {
           </p>
         ) : loading ? (
           <p style={{ textAlign: "center" }}>Đang tải...</p>
+        ) : error ? (
+          <p style={{ textAlign: "center" }}>{error}</p>
         ) : results.length === 0 ? (
           <p style={{ textAlign: "center" }}>Không tìm thấy kết quả</p>
         ) : (

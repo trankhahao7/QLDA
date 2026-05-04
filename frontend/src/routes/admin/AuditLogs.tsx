@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchAuditLogs, type AuditLogItem } from "../../services/auth/auditLogsApi";
 
 interface AuditLog {
   id: number;
@@ -14,11 +16,18 @@ interface AuditLog {
 export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterUser, setFilterUser] = useState("");
   const [filterAction, setFilterAction] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const mapStatus = (trangThai?: number): AuditLog["status"] => {
+    if (trangThai === 1) return "success";
+    if (trangThai === 0) return "failed";
+    return "pending";
+  };
 
   useEffect(() => {
     fetchLogs();
@@ -26,99 +35,36 @@ export default function AuditLogs() {
 
   const fetchLogs = async () => {
     try {
-      // Replace with actual API
-      setTimeout(() => {
-        setLogs([
-          {
-            id: 1,
-            time: "14:30:45",
-            user: "Nguyễn Văn A",
-            action: "Tạo",
-            object: "Người dùng",
-            details: "Tạo người dùng: tranthib",
-            status: "success",
-            ipAddress: "192.168.1.100",
-          },
-          {
-            id: 2,
-            time: "14:25:30",
-            user: "Trần Thị B",
-            action: "Sửa",
-            object: "Quy trình",
-            details: "Cập nhật quy trình QT001",
-            status: "success",
-            ipAddress: "192.168.1.101",
-          },
-          {
-            id: 3,
-            time: "14:20:15",
-            user: "Lê Văn C",
-            action: "Xóa",
-            object: "Template",
-            details: "Xóa template: TMP005",
-            status: "failed",
-            ipAddress: "192.168.1.102",
-          },
-          {
-            id: 4,
-            time: "14:15:00",
-            user: "Phạm Văn D",
-            action: "Xem",
-            object: "Báo cáo",
-            details: "Xem báo cáo thống kê tháng 5",
-            status: "success",
-            ipAddress: "192.168.1.103",
-          },
-          {
-            id: 5,
-            time: "14:10:22",
-            user: "Nguyễn Văn A",
-            action: "Phê duyệt",
-            object: "Văn bản",
-            details: "Phê duyệt văn bản: VB20240503001",
-            status: "success",
-            ipAddress: "192.168.1.100",
-          },
-          {
-            id: 6,
-            time: "14:05:10",
-            user: "Trần Thị B",
-            action: "Sửa",
-            object: "Người dùng",
-            details: "Cập nhật quyền cho nguyenvana",
-            status: "success",
-            ipAddress: "192.168.1.101",
-          },
-          {
-            id: 7,
-            time: "13:55:45",
-            user: "Admin",
-            action: "Đăng nhập",
-            object: "Hệ thống",
-            details: "Đăng nhập thành công",
-            status: "success",
-            ipAddress: "192.168.1.50",
-          },
-          {
-            id: 8,
-            time: "13:50:20",
-            user: "Lê Văn C",
-            action: "Xuất",
-            object: "Báo cáo",
-            details: "Xuất báo cáo tháng 4",
-            status: "success",
-            ipAddress: "192.168.1.102",
-          },
-        ]);
-        setLoading(false);
-      }, 500);
+      setLoading(true);
+      setError(null);
+      const response = await fetchAuditLogs({
+        page: 0,
+        size: 100,
+        keyword: filterUser || undefined,
+        fromDate: dateFrom || undefined,
+        toDate: dateTo || undefined,
+      });
+
+      const mapped: AuditLog[] = (response.content || []).map((log: AuditLogItem) => ({
+        id: log.id,
+        time: new Date(log.thoiGianThucHien).toLocaleString("vi-VN"),
+        user: log.hoTen || `User #${log.nguoiDungId}`,
+        action: log.hanhDong,
+        object: log.doiTuong || "Hệ thống",
+        details: log.noiDungChiTiet || "",
+        status: mapStatus(log.trangThai),
+        ipAddress: log.diaChiIP || "-",
+      }));
+
+      setLogs(mapped);
     } catch (error) {
-      console.error("Error fetching logs:", error);
-      setLoading(false);
+      const message = error instanceof ApiError ? error.message : "Không thể tải nhật ký";
+      setError(message);
     }
+    setLoading(false);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: AuditLog["status"]) => {
     switch (status) {
       case "success":
         return "badge-success";
@@ -131,7 +77,7 @@ export default function AuditLogs() {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: AuditLog["status"]) => {
     switch (status) {
       case "success":
         return "Thành công";
@@ -144,17 +90,25 @@ export default function AuditLogs() {
     }
   };
 
-  const filteredLogs = logs.filter((log) => {
-    return (
-      (filterUser === "" || log.user.includes(filterUser)) &&
-      (filterAction === "" || log.action === filterAction) &&
-      (filterStatus === "" || log.status === filterStatus)
-    );
-  });
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      return (
+        (filterUser === "" || log.user.includes(filterUser)) &&
+        (filterAction === "" || log.action === filterAction) &&
+        (filterStatus === "" || log.status === filterStatus)
+      );
+    });
+  }, [logs, filterUser, filterAction, filterStatus]);
 
   if (loading) {
     return (
       <div className="admin-loading">Đang tải nhật ký hệ thống...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-loading">{error}</div>
     );
   }
 

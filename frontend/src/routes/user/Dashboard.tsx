@@ -1,4 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchIncomingDocuments } from "../../services/documents/documentsApi";
+import { fetchDashboardStats } from "../../services/reports/reportsApi";
+
 
 interface VanBanGanDay {
   id: number;
@@ -9,36 +14,51 @@ interface VanBanGanDay {
 }
 
 export default function Dashboard() {
-  const kpiItems = [
-    { label: "Văn bản đến", value: 12 },
-    { label: "Đang luân chuyển", value: 5 },
-    { label: "Cần phê duyệt", value: 3 },
-    { label: "Đã hoàn tất", value: 28 },
-  ];
+  const [kpiItems, setKpiItems] = useState([
+    { label: "Văn bản đến", value: 0 },
+    { label: "Đang luân chuyển", value: 0 },
+    { label: "Cần phê duyệt", value: 0 },
+    { label: "Đã hoàn tất", value: 0 },
+  ]);
+  const [recentDocs, setRecentDocs] = useState<VanBanGanDay[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const recentDocs: VanBanGanDay[] = [
-    {
-      id: 24,
-      soKyHieu: "VB-024",
-      trichYeu: "Hồ sơ thẩm định dự án số 2",
-      donViBanHanh: "Ban QLDA",
-      trangThai: "Đang xử lý",
-    },
-    {
-      id: 21,
-      soKyHieu: "VB-021",
-      trichYeu: "Công văn bổ sung dự toán",
-      donViBanHanh: "Phòng Kế hoạch",
-      trangThai: "Chờ phê duyệt",
-    },
-    {
-      id: 18,
-      soKyHieu: "VB-018",
-      trichYeu: "Biên bản nghiệm thu giai đoạn 1",
-      donViBanHanh: "Tư vấn giám sát",
-      trangThai: "Đã hoàn tất",
-    },
-  ];
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        const [dashboard, incoming] = await Promise.all([
+          fetchDashboardStats(),
+          fetchIncomingDocuments({ page: 0, size: 5 }),
+        ]);
+
+        setKpiItems([
+          { label: "Văn bản đến", value: dashboard.incomingDocuments || 0 },
+          { label: "Đang luân chuyển", value: dashboard.processingDocuments || 0 },
+          { label: "Cần phê duyệt", value: dashboard.overdueDocuments || 0 },
+          { label: "Đã hoàn tất", value: dashboard.completedDocuments || 0 },
+        ]);
+
+        const statusLabels: Record<number, string> = {
+          1: "Đang xử lý",
+          2: "Hoàn thành",
+        };
+        setRecentDocs(
+          (incoming.content || []).map((doc) => ({
+            id: doc.id,
+            soKyHieu: doc.soKyHieu || "-",
+            trichYeu: doc.trichYeu,
+            donViBanHanh: doc.donViBanHanh || "-",
+            trangThai: doc.trangThai !== undefined ? statusLabels[doc.trangThai] || "-" : "-",
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải dashboard";
+        setError(message);
+      }
+    };
+
+    loadDashboard();
+  }, []);
 
   return (
     <section>
@@ -57,6 +77,11 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {error && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
       <div className="grid-3">
         {kpiItems.map((item) => (
           <div className="card" key={item.label}>

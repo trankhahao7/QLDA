@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchIncomingDocuments, type DocumentListItem } from "../../services/documents/documentsApi";
 
 interface VanBanDen {
   id: number;
@@ -10,32 +13,36 @@ interface VanBanDen {
 }
 
 export default function Inbox() {
-  const documents: VanBanDen[] = [
-    {
-      id: 31,
-      soKyHieu: "VB-031",
-      trichYeu: "Công văn tham gia hội thảo",
-      donViBanHanh: "Sở Xây dựng",
-      ngayTiepNhan: "2026-05-02",
-      doKhan: "Cao",
-    },
-    {
-      id: 30,
-      soKyHieu: "VB-030",
-      trichYeu: "Báo cáo tình hình giải ngân",
-      donViBanHanh: "Kho bạc",
-      ngayTiepNhan: "2026-05-02",
-      doKhan: "Trung bình",
-    },
-    {
-      id: 29,
-      soKyHieu: "VB-029",
-      trichYeu: "Kế hoạch giám sát dự án",
-      donViBanHanh: "Phòng Giám sát",
-      ngayTiepNhan: "2026-05-01",
-      doKhan: "Cao",
-    },
-  ];
+  const [documents, setDocuments] = useState<VanBanDen[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadInbox = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchIncomingDocuments({ page: 0, size: 20 });
+        setDocuments(
+          (response.content || []).map((doc: DocumentListItem) => ({
+            id: doc.id,
+            soKyHieu: doc.soKyHieu || "-",
+            trichYeu: doc.trichYeu,
+            donViBanHanh: doc.donViBanHanh || "-",
+            ngayTiepNhan: doc.ngayTiepNhan || "",
+            doKhan: doc.doKhan || "-",
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải văn bản đến";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInbox();
+  }, []);
 
   return (
     <section>
@@ -55,6 +62,8 @@ export default function Inbox() {
       </div>
 
       <div className="card">
+        {loading && <p>Đang tải...</p>}
+        {error && <p>{error}</p>}
         <table className="table">
           <thead>
             <tr>

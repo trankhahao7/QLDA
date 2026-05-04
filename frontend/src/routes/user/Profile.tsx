@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { getCurrentUser } from "../../services/auth/authApi";
+import { updateMyProfile } from "../../services/auth/meApi";
 
 export default function Profile() {
   const [profile, setProfile] = useState({
@@ -6,6 +9,8 @@ export default function Profile() {
     email: "vana@coquan.gov.vn",
     donVi: "Phòng Kế hoạch",
   });
+  const [userId, setUserId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState({
     newDocs: true,
     deadline: false,
@@ -13,9 +18,39 @@ export default function Profile() {
   });
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const user = await getCurrentUser();
+        setUserId(user.id);
+        setProfile({
+          hoTen: user.hoTen,
+          email: user.email,
+          donVi: user.donViId ? String(user.donViId) : "",
+        });
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải hồ sơ";
+        setError(message);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const handleSave = async () => {
+    if (!userId) return;
+    try {
+      await updateMyProfile(userId, {
+        hoTen: profile.hoTen,
+        email: profile.email,
+      });
+      setError(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Lưu thất bại";
+      setError(message);
+    }
   };
 
   return (
@@ -33,6 +68,11 @@ export default function Profile() {
       </div>
 
       <div className="grid-2">
+        {error && (
+          <div className="card" style={{ marginBottom: 12 }}>
+            {error}
+          </div>
+        )}
         <div className="card">
           <h3>Thông tin cơ bản</h3>
           <form className="form-grid">

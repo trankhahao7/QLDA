@@ -1,4 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchPendingApprovals } from "../../services/workflows/approvalsApi";
+import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
+import { fetchDashboardStats } from "../../services/reports/reportsApi";
+import { fetchUnits } from "../../services/units/unitsApi";
+import { fetchUsers } from "../../services/auth/usersApi";
 
 interface SystemStats {
   totalUsers: number;
@@ -24,31 +30,37 @@ export default function AdminDashboard() {
   });
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate API call - replace with actual API
     const fetchStats = async () => {
       try {
-        // const response = await fetch('/api/admin/stats');
-        // const data = await response.json();
-        // setStats(data);
+        setLoading(true);
+        setError(null);
+        const [dashboard, usersAll, usersActive, units, documentTypes, approvals] = await Promise.all([
+          fetchDashboardStats(),
+          fetchUsers({ page: 0, size: 1 }),
+          fetchUsers({ page: 0, size: 1, trangThai: 1 }),
+          fetchUnits({ page: 0, size: 1 }),
+          fetchDocumentTypes({}),
+          fetchPendingApprovals({ page: 0, size: 1 }),
+        ]);
 
-        // Mock data for demo
-        setTimeout(() => {
-          setStats({
-            totalUsers: 145,
-            activeUsers: 89,
-            totalDocuments: 3421,
-            processingDocuments: 23,
-            completedToday: 12,
-            pendingApprovals: 8,
-            units: 15,
-            documentTypes: 12,
-          });
-          setLoading(false);
-        }, 500);
+        setStats({
+          totalUsers: usersAll.totalElements || 0,
+          activeUsers: usersActive.totalElements || 0,
+          totalDocuments: dashboard.totalDocuments || 0,
+          processingDocuments: dashboard.processingDocuments || 0,
+          completedToday: 0, // TODO: cập nhật nếu có API thống kê theo ngày
+          pendingApprovals: approvals.totalElements || 0,
+          units: units.totalElements || 0,
+          documentTypes: documentTypes.length,
+        });
+        setLoading(false);
       } catch (error) {
         console.error("Error fetching stats:", error);
+        const message = error instanceof ApiError ? error.message : "Không thể tải thống kê";
+        setError(message);
         setLoading(false);
       }
     };
@@ -58,6 +70,10 @@ export default function AdminDashboard() {
 
   if (loading) {
     return <div className="admin-loading">Đang tải dữ liệu...</div>;
+  }
+
+  if (error) {
+    return <div className="admin-loading">{error}</div>;
   }
 
   return (

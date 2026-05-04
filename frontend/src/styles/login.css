@@ -70,17 +70,42 @@
 }
 
 /* FEATURE CARDS - Chữ trắng trên nền mờ */
+/* Tìm đến đoạn .features và cập nhật/thêm mới các class sau */
+.features {
+  display: flex;
+  flex-direction: column; /* Sắp xếp các card theo hàng dọc */
+  gap: 20px;
+  width: 100%;
+  max-width: 500px;
+}
+
 .feature-card {
   background: rgba(255, 255, 255, 0.1);
-  padding: 20px;
+  padding: 24px; /* Tăng padding để card rộng rãi hơn */
   border-radius: 15px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   transition: all 0.3s ease;
+  
+  /* Căn chỉnh icon và chữ nằm ngang */
+  display: flex;
+  align-items: center;
+  gap: 20px; /* Khoảng cách giữa icon và chữ */
 }
 
-.feature-card:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-5px);
+.feature-card .icon {
+  font-size: 40px; /* Tăng kích thước icon (emoji) */
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px; /* Đảm bảo các icon có độ rộng bằng nhau để chữ thẳng hàng */
+}
+
+.feature-card p {
+  margin-bottom: 0 !important; /* Xóa margin bottom mặc định của thẻ p */
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-align: left;
 }
 
 /* RIGHT SIDE - LOGIN */

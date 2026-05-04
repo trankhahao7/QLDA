@@ -8,7 +8,6 @@ import Inbox from "./routes/user/Inbox";
 import Login from "./routes/user/Login";
 import NotFound from "./routes/user/NotFound";
 import Profile from "./routes/user/Profile";
-import Projects from "./routes/user/Projects";
 import Search from "./routes/user/Search";
 import Upload from "./routes/user/Upload";
 import ChatBot from "./shared/ChatBot";
@@ -35,7 +34,6 @@ function App() {
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/search" element={<Search />} />
-          <Route path="/projects" element={<Projects />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/documents/:id" element={<DocumentDetail />} />
         </Route>
