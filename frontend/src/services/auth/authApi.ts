@@ -30,3 +30,8 @@ export const loginAzure = (authorizationCode: string, redirectUri: string) =>
     authorizationCode,
     redirectUri,
   }, { auth: false });
+
+export const loginAzureWithToken = (accessToken: string) =>
+  apiPost<AuthTokens & { user: AuthUser }>("/api/auth/login/azure", {
+    accessToken,
+  }, { auth: false });

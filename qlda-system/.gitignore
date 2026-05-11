@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.agents/
+.codex/
+
+.pem
