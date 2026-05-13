@@ -1,164 +1,196 @@
 package com.qlda.authservice.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.microsoft.aad.msal4j.AuthorizationCodeParameters;
-import com.microsoft.aad.msal4j.ClientCredentialFactory;
-import com.microsoft.aad.msal4j.ConfidentialClientApplication;
-import com.microsoft.aad.msal4j.IAuthenticationResult;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.qlda.authservice.config.AuthProperties;
 import com.qlda.authservice.dto.auth.AzureLoginRequest;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
-
-import java.net.URI;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Set;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Service
 public class AzureAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AzureAuthService.class);
 
-    private final AuthProperties authProperties;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
+    private static final String DEFAULT_SCOPE = "openid profile email offline_access User.Read";
+    private static final String GRAPH_ME_ENDPOINT = "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName";
 
+    private final AuthProperties authProperties;
+    private final RestClient restClient;
+    private final Map<String, JwtDecoder> jwtDecoders = new ConcurrentHashMap<>();
+
+    @Autowired
     public AzureAuthService(AuthProperties authProperties) {
+        this(authProperties, RestClient.builder());
+    }
+
+    AzureAuthService(AuthProperties authProperties, RestClient.Builder restClientBuilder) {
         this.authProperties = authProperties;
-        this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
+        this.restClient = restClientBuilder.build();
     }
 
     public AzureUserInfo exchangeCodeForUser(AzureLoginRequest request) {
-        System.out.println("[DEBUG] AzureAuthService.exchangeCodeForUser() - Start");
-        System.out.println("[DEBUG] AzureAuthService - Request: " + request);
-
         AuthProperties.Azure azure = authProperties.getAzure();
-        System.out.println("[DEBUG] AzureAuthService - Azure config - TenantId present: " + StringUtils.hasText(azure.getTenantId()));
-        System.out.println("[DEBUG] AzureAuthService - Azure config - ClientId present: " + StringUtils.hasText(azure.getClientId()));
-
-        if (!StringUtils.hasText(azure.getTenantId())
-                || !StringUtils.hasText(azure.getClientId())) {
-            log.warn("Azure AD credentials not configured");
-            System.out.println("[DEBUG] AzureAuthService - Azure credentials NOT configured, returning null");
+        if (!isAzureConfigured(azure)
+                || !StringUtils.hasText(request.authorizationCode())
+                || !StringUtils.hasText(request.redirectUri())) {
             return null;
         }
 
-        String accessToken = request.accessToken();
-        System.out.println("[DEBUG] AzureAuthService - Access token present: " + StringUtils.hasText(accessToken));
-
-        if (StringUtils.hasText(accessToken)) {
-            log.info("Processing Azure login with access token (Implicit Flow)");
-            System.out.println("[DEBUG] AzureAuthService - Using Implicit Flow (access token)");
-            System.out.println("[DEBUG] AzureAuthService - Token (first 50): " + accessToken.substring(0, Math.min(50, accessToken.length())) + "...");
-            return getUserInfoFromAccessToken(accessToken);
+        OAuthTokenResponse tokenResponse = exchangeAuthorizationCode(azure, request);
+        if (tokenResponse == null) {
+            return null;
         }
 
-        if (StringUtils.hasText(request.authorizationCode())) {
-            log.info("Processing Azure login with authorization code (Auth Code Flow)");
-            System.out.println("[DEBUG] AzureAuthService - Using Auth Code Flow");
-            System.out.println("[DEBUG] AzureAuthService - Auth code (first 20): " + request.authorizationCode().substring(0, Math.min(20, request.authorizationCode().length())) + "...");
-            System.out.println("[DEBUG] AzureAuthService - Redirect URI: " + request.redirectUri());
-            return getUserInfoFromAuthorizationCode(request, azure);
+        AzureUserInfo fromIdToken = resolveUserFromIdToken(azure, tokenResponse.idToken());
+        if (fromIdToken != null) {
+            return fromIdToken;
         }
-
-        log.warn("No valid Azure credential provided");
-        System.out.println("[DEBUG] AzureAuthService - No valid credentials, returning null");
-        return null;
+        return resolveUserFromGraph(tokenResponse.accessToken(), isAzureConfigured(azure));
     }
 
-    private AzureUserInfo getUserInfoFromAccessToken(String accessToken) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + accessToken);
+    private OAuthTokenResponse exchangeAuthorizationCode(AuthProperties.Azure azure, AzureLoginRequest request) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("client_id", azure.getClientId().trim());
+        if (StringUtils.hasText(azure.getClientSecret())) {
+            form.add("client_secret", azure.getClientSecret().trim());
+        }
+        form.add("grant_type", "authorization_code");
+        form.add("code", request.authorizationCode().trim());
+        form.add("redirect_uri", request.redirectUri().trim());
+        form.add("scope", DEFAULT_SCOPE);
+        if (StringUtils.hasText(request.codeVerifier())) {
+            form.add("code_verifier", request.codeVerifier().trim());
+        }
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    "https://graph.microsoft.com/v1.0/me",
-                    HttpMethod.GET,
-                    new HttpEntity<>(headers),
-                    String.class
+        try {
+            return restClient.post()
+                    .uri(tokenEndpoint(azure.getTenantId().trim()))
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(form)
+                    .retrieve()
+                    .body(OAuthTokenResponse.class);
+        } catch (RestClientException exception) {
+            log.error("Azure token exchange failed: {}", exception.getMessage(), exception);
+            return null;
+        }
+    }
+
+    private AzureUserInfo resolveUserFromIdToken(AuthProperties.Azure azure, String idToken) {
+        if (!StringUtils.hasText(idToken)) {
+            return null;
+        }
+        try {
+            Jwt jwt = jwtDecoderFor(azure).decode(idToken.trim());
+            String azureAdId = firstNonBlank(jwt.getClaimAsString("oid"), jwt.getSubject());
+            if (!StringUtils.hasText(azureAdId)) {
+                return null;
+            }
+            String email = firstNonBlank(
+                    jwt.getClaimAsString("email"),
+                    jwt.getClaimAsString("preferred_username"),
+                    jwt.getClaimAsString("upn")
             );
+            String username = firstNonBlank(
+                    jwt.getClaimAsString("preferred_username"),
+                    jwt.getClaimAsString("upn"),
+                    email,
+                    azureAdId
+            );
+            String displayName = firstNonBlank(jwt.getClaimAsString("name"), username);
 
-            if (response.getBody() != null) {
-                JsonNode json = objectMapper.readTree(response.getBody());
-                return new AzureUserInfo(
-                        json.has("id") ? json.get("id").asText() : "",
-                        json.has("mail") && !json.get("mail").isNull() ? json.get("mail").asText()
-                                : (json.has("userPrincipalName") ? json.get("userPrincipalName").asText() : ""),
-                        json.has("mail") && !json.get("mail").isNull() ? json.get("mail").asText().split("@")[0]
-                                : (json.has("userPrincipalName") ? json.get("userPrincipalName").asText().split("@")[0] : "azureuser"),
-                        json.has("displayName") ? json.get("displayName").asText() : "Azure User",
-                        true
-                );
-            }
-        } catch (Exception e) {
-            log.info("Graph API call failed, falling back to JWT decode: {}", e.getMessage());
-            return decodeJwtToken(accessToken);
-        }
-        return null;
-    }
-
-    private AzureUserInfo getUserInfoFromAuthorizationCode(AzureLoginRequest request, AuthProperties.Azure azure) {
-        if (!StringUtils.hasText(azure.getClientSecret())) {
-            log.warn("Azure client secret is required for authorization code flow");
-            return null;
-        }
-
-        try {
-            String authority = "https://login.microsoftonline.com/" + azure.getTenantId();
-            ConfidentialClientApplication clientApp = ConfidentialClientApplication.builder(
-                    azure.getClientId(),
-                    ClientCredentialFactory.createFromSecret(azure.getClientSecret())
-            ).authority(authority).build();
-
-            Set<String> scopes = Collections.singleton("https://graph.microsoft.com/.default");
-            IAuthenticationResult result = clientApp.acquireToken(
-                    AuthorizationCodeParameters.builder(
-                            request.authorizationCode(),
-                            URI.create(request.redirectUri())
-                    ).scopes(scopes).build()
-            ).get();
-
-            return getUserInfoFromAccessToken(result.accessToken());
-        } catch (Exception e) {
-            log.error("Authorization code exchange failed: {}", e.getMessage());
+            return new AzureUserInfo(azureAdId, email, username, displayName, true);
+        } catch (JwtException exception) {
+            log.warn("id_token validation failed (will fallback to Graph): {}", exception.getMessage());
             return null;
         }
     }
 
-    private AzureUserInfo decodeJwtToken(String token) {
-        try {
-            String[] parts = token.split("\\.");
-            if (parts.length >= 2) {
-                String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
-                JsonNode json = objectMapper.readTree(payload);
-
-                String email = json.has("mail") ? json.get("mail").asText()
-                        : json.has("unique_name") ? json.get("unique_name").asText()
-                        : json.has("upn") ? json.get("upn").asText() : "";
-                String name = json.has("name") ? json.get("name").asText() : "Azure User";
-                String oid = json.has("oid") ? json.get("oid").asText() : "";
-
-                return new AzureUserInfo(
-                        oid,
-                        email,
-                        email.contains("@") ? email.split("@")[0] : "azureuser",
-                        name,
-                        false
-                );
-            }
-        } catch (Exception e) {
-            log.error("JWT decode failed: {}", e.getMessage());
+    private AzureUserInfo resolveUserFromGraph(String accessToken, boolean configured) {
+        if (!StringUtils.hasText(accessToken)) {
             return null;
+        }
+        try {
+            GraphMeResponse profile = restClient.get()
+                    .uri(GRAPH_ME_ENDPOINT)
+                    .headers(headers -> headers.setBearerAuth(accessToken.trim()))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(GraphMeResponse.class);
+            if (profile == null || !StringUtils.hasText(profile.id())) {
+                return null;
+            }
+
+            String email = firstNonBlank(profile.mail(), profile.userPrincipalName());
+            String username = firstNonBlank(profile.userPrincipalName(), email, profile.id());
+            String displayName = firstNonBlank(profile.displayName(), username);
+            return new AzureUserInfo(profile.id().trim(), email, username, displayName, configured);
+        } catch (RestClientException exception) {
+            log.error("Graph API call failed: {}", exception.getMessage(), exception);
+            return null;
+        }
+    }
+
+    private JwtDecoder jwtDecoderFor(AuthProperties.Azure azure) {
+        String tenantId = azure.getTenantId().trim();
+        String cacheKey = tenantId + "|" + azure.getClientId().trim();
+        return jwtDecoders.computeIfAbsent(cacheKey, ignored -> {
+            String issuer = issuer(tenantId);
+            NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri(tenantId)).build();
+            OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
+            OAuth2TokenValidator<Jwt> audienceValidator = jwt -> {
+                if (jwt.getAudience() != null && jwt.getAudience().contains(azure.getClientId().trim())) {
+                    return OAuth2TokenValidatorResult.success();
+                }
+                return OAuth2TokenValidatorResult.failure(
+                        new OAuth2Error("invalid_token", "Invalid id_token audience", null)
+                );
+            };
+            decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerValidator, audienceValidator));
+            return decoder;
+        });
+    }
+
+    private boolean isAzureConfigured(AuthProperties.Azure azure) {
+        return StringUtils.hasText(azure.getTenantId()) && StringUtils.hasText(azure.getClientId());
+    }
+
+    private String tokenEndpoint(String tenantId) {
+        return "https://login.microsoftonline.com/" + tenantId + "/oauth2/v2.0/token";
+    }
+
+    private String jwkSetUri(String tenantId) {
+        return "https://login.microsoftonline.com/" + tenantId + "/discovery/v2.0/keys";
+    }
+
+    private String issuer(String tenantId) {
+        return "https://login.microsoftonline.com/" + tenantId + "/v2.0";
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value.trim();
+            }
         }
         return null;
     }
@@ -169,6 +201,22 @@ public class AzureAuthService {
             String username,
             String displayName,
             boolean graphConfigured
+    ) {
+    }
+
+    private record OAuthTokenResponse(
+            @JsonProperty("access_token")
+            String accessToken,
+            @JsonProperty("id_token")
+            String idToken
+    ) {
+    }
+
+    private record GraphMeResponse(
+            String id,
+            String displayName,
+            String mail,
+            String userPrincipalName
     ) {
     }
 }

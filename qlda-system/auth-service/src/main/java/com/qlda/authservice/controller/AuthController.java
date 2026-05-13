@@ -32,18 +32,6 @@ public class AuthController {
             @Valid @RequestBody AzureLoginRequest request,
             HttpServletRequest httpServletRequest
     ) {
-        System.out.println("[DEBUG] ===== AZURE LOGIN REQUEST RECEIVED =====");
-        System.out.println("[DEBUG] Request body: " + request);
-        System.out.println("[DEBUG] Authorization code present: " + (request.authorizationCode() != null && !request.authorizationCode().trim().isEmpty()));
-        System.out.println("[DEBUG] Redirect URI: " + request.redirectUri());
-        System.out.println("[DEBUG] Access token present: " + (request.accessToken() != null && !request.accessToken().trim().isEmpty()));
-        if (request.accessToken() != null && !request.accessToken().trim().isEmpty()) {
-            System.out.println("[DEBUG] Access token (first 50 chars): " + request.accessToken().substring(0, Math.min(50, request.accessToken().length())) + "...");
-            System.out.println("[DEBUG] Access token length: " + request.accessToken().length());
-        }
-        System.out.println("[DEBUG] Client IP: " + httpServletRequest.getRemoteAddr());
-        System.out.println("[DEBUG] ========================================");
-
         return ApiResponse.success("Azure login successfully", authService.loginAzure(request, httpServletRequest.getRemoteAddr()));
     }
 

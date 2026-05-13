@@ -5,6 +5,10 @@ import com.qlda.authservice.entity.NguoiDung;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -23,7 +27,6 @@ import java.security.spec.X509EncodedKeySpec;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class JwtService {
@@ -121,9 +124,7 @@ public class JwtService {
     private KeyPair buildKeyPair(AuthProperties.Jwt jwt) {
         try {
             if (StringUtils.hasText(jwt.getPrivateKey()) && StringUtils.hasText(jwt.getPublicKey())) {
-                String publicKeyContent = loadKeyContent(jwt.getPublicKey());
-                String privateKeyContent = loadKeyContent(jwt.getPrivateKey());
-                return new KeyPair(parsePublicKey(publicKeyContent), parsePrivateKey(privateKeyContent));
+                return new KeyPair(parsePublicKey(jwt.getPublicKey()), parsePrivateKey(jwt.getPrivateKey()));
             }
             KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
             generator.initialize(2048);
@@ -131,17 +132,6 @@ public class JwtService {
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to initialize RSA key pair for JWT", exception);
         }
-    }
-
-    private String loadKeyContent(String keyPath) throws Exception {
-        if (keyPath.startsWith("classpath:")) {
-            String resourcePath = keyPath.substring("classpath:".length());
-            ClassPathResource resource = new ClassPathResource(resourcePath);
-            byte[] fileBytes = resource.getInputStream().readAllBytes();
-            return new String(fileBytes, StandardCharsets.UTF_8);
-        }
-        // If it's not a classpath resource, treat it as direct content
-        return keyPath;
     }
 
     private PrivateKey parsePrivateKey(String value) throws Exception {
@@ -157,12 +147,36 @@ public class JwtService {
     }
 
     private byte[] decodeKeyMaterial(String value) {
-        String normalized = value
+        String material = resolveKeySource(value);
+        String normalized = material
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
         return Base64.getDecoder().decode(normalized);
+    }
+
+    private String resolveKeySource(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.startsWith("classpath:")) {
+            String classpathLocation = trimmed.substring("classpath:".length()).replaceFirst("^/+", "");
+            try {
+                ClassPathResource resource = new ClassPathResource(classpathLocation);
+                return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException exception) {
+                throw new IllegalArgumentException("Cannot read classpath key material: " + trimmed, exception);
+            }
+        }
+
+        Path path = Path.of(trimmed);
+        if (Files.exists(path)) {
+            try {
+                return Files.readString(path, StandardCharsets.UTF_8);
+            } catch (IOException exception) {
+                throw new IllegalArgumentException("Cannot read key material file: " + trimmed, exception);
+            }
+        }
+        return trimmed;
     }
 }

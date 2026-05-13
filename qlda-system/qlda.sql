@@ -1,3 +1,7 @@
+-- =========================
+-- 1. AUTH SERVICE
+-- =========================
+
 CREATE TABLE DonVi (
     ID SERIAL PRIMARY KEY,
     MaDonVi VARCHAR(50) NOT NULL,
@@ -71,6 +75,11 @@ CREATE TABLE PhanQuyen (
     CONSTRAINT uq_phanquyen_nhom_chucnang UNIQUE (NhomQuyenID, ChucNangID)
 );
 
+
+-- =========================
+-- 2. DOCUMENT SERVICE
+-- =========================
+
 CREATE TABLE LoaiVanBan (
     ID SERIAL PRIMARY KEY,
     MaLoaiVanBan VARCHAR(50) NOT NULL,
@@ -94,7 +103,7 @@ CREATE TABLE VanBan (
     DoMat VARCHAR(50),
     DoKhan VARCHAR(50),
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiTaoID BIGINT,
     DonViChuTriID INT,
 
@@ -120,7 +129,7 @@ CREATE TABLE TepDinhKem (
     LoaiTep VARCHAR(50),
     KichThuoc BIGINT,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiTaiLenID BIGINT,
 
     NgayTaiLen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -136,7 +145,7 @@ CREATE TABLE TemplateVanBan (
     NoiDungMau TEXT,
     TepMau VARCHAR(500),
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiTaoID BIGINT,
 
     SuDung BOOLEAN DEFAULT TRUE,
@@ -151,7 +160,7 @@ CREATE TABLE HoSoCongViec (
     TenHoSo VARCHAR(500) NOT NULL,
     VanBanID BIGINT,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiPhuTrachID BIGINT,
     DonViID INT,
 
@@ -164,12 +173,17 @@ CREATE TABLE HoSoCongViec (
     CONSTRAINT fk_hoso_vanban FOREIGN KEY (VanBanID) REFERENCES VanBan(ID)
 );
 
+
+-- =========================
+-- 3. WORKFLOW SERVICE
+-- =========================
+
 CREATE TABLE QuyTrinh (
     ID SERIAL PRIMARY KEY,
     MaQuyTrinh VARCHAR(50) NOT NULL,
     TenQuyTrinh VARCHAR(255) NOT NULL,
 
-    
+    -- ID tham chiếu mềm sang document-service
     LoaiVanBanID INT,
 
     MoTa VARCHAR(1000),
@@ -195,12 +209,12 @@ CREATE TABLE BuocQuyTrinh (
 CREATE TABLE XuLyVanBan (
     ID BIGSERIAL PRIMARY KEY,
 
-    
+    -- ID tham chiếu mềm sang document-service
     VanBanID BIGINT NOT NULL,
 
     BuocQuyTrinhID BIGINT,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiGuiID BIGINT,
     NguoiNhanID BIGINT,
     DonViXuLyID INT,
@@ -220,15 +234,20 @@ CREATE TABLE XuLyVanBan (
     )
 );
 
+
+-- =========================
+-- 4. SUPPORT SERVICE
+-- =========================
+
 CREATE TABLE ThongBao (
     ID BIGSERIAL PRIMARY KEY,
     TieuDe VARCHAR(255) NOT NULL,
     NoiDung TEXT NOT NULL,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiNhanID BIGINT,
 
-    
+    -- ID tham chiếu mềm sang document-service
     VanBanID BIGINT,
 
     LoaiThongBao VARCHAR(100),
@@ -241,7 +260,7 @@ CREATE TABLE ThongBao (
 CREATE TABLE LichSuHeThong (
     ID BIGSERIAL PRIMARY KEY,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiDungID BIGINT,
 
     HanhDong VARCHAR(255) NOT NULL,
@@ -253,13 +272,18 @@ CREATE TABLE LichSuHeThong (
     TrangThai INT
 );
 
+
+-- =========================
+-- 5. AI SERVICE
+-- =========================
+
 CREATE TABLE KetQuaAI (
     ID BIGSERIAL PRIMARY KEY,
 
-    
+    -- ID tham chiếu mềm sang document-service
     VanBanID BIGINT,
 
-    
+    -- ID tham chiếu mềm sang auth-service
     NguoiYeuCauID BIGINT,
 
     LoaiXuLyAI VARCHAR(100) NOT NULL,
@@ -272,6 +296,10 @@ CREATE TABLE KetQuaAI (
 );
 
 
+-- =========================
+-- 6. INDEX CHO AUTH SERVICE
+-- =========================
+
 CREATE INDEX idx_nguoidung_donvi 
 ON NguoiDung(DonViID);
 
@@ -280,6 +308,11 @@ ON NguoiDung(NhomQuyenID);
 
 CREATE INDEX idx_phanquyen_nhomquyen_chucnang 
 ON PhanQuyen(NhomQuyenID, ChucNangID);
+
+
+-- =========================
+-- 7. INDEX CHO DOCUMENT SERVICE
+-- =========================
 
 CREATE INDEX idx_vanban_loaivanban 
 ON VanBan(LoaiVanBanID);
@@ -331,6 +364,10 @@ CREATE INDEX idx_hoso_donvi
 ON HoSoCongViec(DonViID);
 
 
+-- =========================
+-- 8. INDEX CHO WORKFLOW SERVICE
+-- =========================
+
 CREATE INDEX idx_quytrinh_loaivanban 
 ON QuyTrinh(LoaiVanBanID);
 
@@ -359,6 +396,11 @@ CREATE INDEX idx_xuly_chuahoanthanh
 ON XuLyVanBan(NguoiNhanID, HanXuLy)
 WHERE NgayHoanThanh IS NULL;
 
+
+-- =========================
+-- 9. INDEX CHO SUPPORT SERVICE
+-- =========================
+
 CREATE INDEX idx_thongbao_nguoinhan 
 ON ThongBao(NguoiNhanID);
 
@@ -379,6 +421,10 @@ CREATE INDEX idx_lichsu_doituong
 ON LichSuHeThong(DoiTuong, DoiTuongID);
 
 
+-- =========================
+-- 10. INDEX CHO AI SERVICE
+-- =========================
+
 CREATE INDEX idx_ketquaai_vanban 
 ON KetQuaAI(VanBanID);
 
@@ -388,6 +434,10 @@ ON KetQuaAI(VanBanID, LoaiXuLyAI);
 CREATE INDEX idx_ketquaai_nguoiyeucau 
 ON KetQuaAI(NguoiYeuCauID);
 
+
+-- =========================
+-- 11. FULL TEXT SEARCH CHO VĂN BẢN
+-- =========================
 
 CREATE INDEX idx_vanban_fulltext 
 ON VanBan 

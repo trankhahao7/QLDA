@@ -12,10 +12,10 @@ public final class XuLyVanBanSpecification {
 
     public static Specification<XuLyVanBan> pendingApprovals(Long nguoiNhanId, String keyword, LocalDate fromDate, LocalDate toDate) {
         return (root, query, cb) -> {
-            var predicates = cb.and(
-                    cb.equal(root.get("nguoiNhanId"), nguoiNhanId),
-                    cb.equal(root.get("trangThaiXuLy"), 1)
-            );
+            var predicates = cb.equal(root.get("trangThaiXuLy"), 1);
+            if (nguoiNhanId != null) {
+                predicates = cb.and(predicates, cb.equal(root.get("nguoiNhanId"), nguoiNhanId));
+            }
             if (keyword != null && !keyword.isBlank()) {
                 String like = "%" + keyword.trim().toLowerCase() + "%";
                 predicates = cb.and(predicates, cb.or(

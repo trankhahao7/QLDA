@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./styles/app.css";
 import AppShell from "./shared/AppShell";
 import AdminShell from "./shared/AdminShell";
@@ -22,12 +22,17 @@ import TemplateManagement from "./routes/admin/TemplateManagement";
 import SystemMonitoring from "./routes/admin/SystemMonitoring";
 import AuditLogs from "./routes/admin/AuditLogs";
 
+function RootRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/login${search}`} replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <ChatBot />
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<Login />} />
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />

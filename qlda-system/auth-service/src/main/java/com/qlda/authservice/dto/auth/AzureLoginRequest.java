@@ -1,17 +1,16 @@
 package com.qlda.authservice.dto.auth;
 
-import jakarta.validation.constraints.AssertTrue;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.constraints.NotBlank;
 
 public record AzureLoginRequest(
+        @NotBlank(message = "authorizationCode is required")
+        @JsonAlias({"authorization_code", "code"})
         String authorizationCode,
+        @NotBlank(message = "redirectUri is required")
+        @JsonAlias("redirect_uri")
         String redirectUri,
-        String accessToken
+        @JsonAlias("code_verifier")
+        String codeVerifier
 ) {
-        @AssertTrue(message = "Either authorizationCode+redirectUri or accessToken must be provided")
-        public boolean isValidCredentials() {
-                boolean hasCodeFlow = authorizationCode != null && !authorizationCode.trim().isEmpty()
-                        && redirectUri != null && !redirectUri.trim().isEmpty();
-                boolean hasTokenFlow = accessToken != null && !accessToken.trim().isEmpty();
-                return hasCodeFlow || hasTokenFlow;
-        }
 }

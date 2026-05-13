@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg17
     container_name: qlda-postgres
     environment:
       POSTGRES_DB: QLDA
@@ -65,14 +65,17 @@ services:
       context: ./auth-service
     container_name: qlda-auth-service
     depends_on:
+      - postgres
       - eureka-server
     ports:
       - "8081:8081"
+    env_file:
+      - .env
     environment:
       SERVER_PORT: 8081
-      DB_URL: jdbc:postgresql://host.docker.internal:5432/qlda
+      DB_URL: jdbc:postgresql://postgres:5432/QLDA
       DB_USERNAME: postgres
-      DB_PASSWORD: hao1482005
+      DB_PASSWORD: 123456
       EUREKA_ENABLED: true
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
       INTERNAL_SERVICE_TOKEN: change-me-in-dev
@@ -80,6 +83,9 @@ services:
       AUTH_JWT_PRIVATE_KEY: classpath:private.pem
       AUTH_JWT_PUBLIC_KEY: classpath:public.pem
       AUTH_JWT_SECRET: ""
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:-}
     networks:
       - qlda-net
 
@@ -88,6 +94,7 @@ services:
       context: ./document-service
     container_name: qlda-document-service
     depends_on:
+      - postgres
       - kafka
       - eureka-server
       - auth-service
@@ -95,9 +102,9 @@ services:
       - "8082:8082"
     environment:
       SERVER_PORT: 8082
-      DB_URL: jdbc:postgresql://host.docker.internal:5432/qlda
+      DB_URL: jdbc:postgresql://postgres:5432/QLDA
       DB_USERNAME: postgres
-      DB_PASSWORD: hao1482005
+      DB_PASSWORD: 123456
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_ENABLED: true
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
@@ -118,6 +125,7 @@ services:
       context: ./workflow-service
     container_name: qlda-workflow-service
     depends_on:
+      - postgres
       - kafka
       - eureka-server
       - auth-service
@@ -126,9 +134,9 @@ services:
       - "8083:8083"
     environment:
       SERVER_PORT: 8083
-      DB_URL: jdbc:postgresql://host.docker.internal:5432/qlda
+      DB_URL: jdbc:postgresql://postgres:5432/QLDA
       DB_USERNAME: postgres
-      DB_PASSWORD: hao1482005
+      DB_PASSWORD: 123456
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_ENABLED: true
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
@@ -143,11 +151,40 @@ services:
     networks:
       - qlda-net
 
+  ai-service:
+    build:
+      context: ./ai-service
+    container_name: qlda-ai-service
+    depends_on:
+      - postgres
+      - eureka-server
+      - auth-service
+      - document-service
+      - workflow-service
+    ports:
+      - "8084:8084"
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/QLDA
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      EUREKA_ENABLED: true
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      DOCUMENT_SERVICE_BASE_URL: http://document-service:8082
+      WORKFLOW_SERVICE_BASE_URL: http://workflow-service:8083
+      AUTH_SERVICE_BASE_URL: http://auth-service:8081
+      SERVICE_NAME: ai-service
+      INTERNAL_SERVICE_TOKEN: change-me-in-dev
+      GEMINI_API_KEY:
+    networks:
+      - qlda-net
+
   notification-service:
     build:
       context: ./notification-service
     container_name: qlda-notification-service
     depends_on:
+      - postgres
       - kafka
       - eureka-server
       - auth-service
@@ -155,9 +192,9 @@ services:
       - "8085:8085"
     environment:
       SERVER_PORT: 8085
-      DB_URL: jdbc:postgresql://host.docker.internal:5432/qlda
+      DB_URL: jdbc:postgresql://postgres:5432/QLDA
       DB_USERNAME: postgres
-      DB_PASSWORD: hao1482005
+      DB_PASSWORD: 123456
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_ENABLED: true
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka
@@ -187,6 +224,7 @@ services:
       - document-service
       - workflow-service
       - notification-service
+      - ai-service
     ports:
       - "8080:8080"
     environment:

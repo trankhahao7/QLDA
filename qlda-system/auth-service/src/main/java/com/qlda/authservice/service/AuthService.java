@@ -55,59 +55,32 @@ public class AuthService {
     }
 
     public AuthTokenResponse loginAzure(AzureLoginRequest request, String ipAddress) {
-        System.out.println("[DEBUG] AuthService.loginAzure() - Processing request");
-        System.out.println("[DEBUG] AuthService - Request: " + request);
-
         AzureAuthService.AzureUserInfo azureUserInfo = azureAuthService.exchangeCodeForUser(request);
-        System.out.println("[DEBUG] AuthService - Azure user info received: " + azureUserInfo);
-
         if (azureUserInfo == null || !StringUtils.hasText(azureUserInfo.azureAdId())) {
-            System.out.println("[DEBUG] AuthService - Azure auth failed: azureUserInfo is null or azureAdId is empty");
             throw new ApiException(HttpStatus.UNAUTHORIZED, ErrorCode.AZURE_AUTH_FAILED, "Azure login failed");
         }
 
-        System.out.println("[DEBUG] AuthService - Looking up user by AzureAdId: " + azureUserInfo.azureAdId());
         Optional<NguoiDung> byAzureId = nguoiDungRepository.findByAzureAdId(azureUserInfo.azureAdId());
-        System.out.println("[DEBUG] AuthService - Found by AzureAdId: " + byAzureId.isPresent());
-
-        System.out.println("[DEBUG] AuthService - Looking up user by email: " + azureUserInfo.email());
         Optional<NguoiDung> byEmail = StringUtils.hasText(azureUserInfo.email())
                 ? nguoiDungRepository.findByEmail(azureUserInfo.email())
                 : Optional.empty();
-        System.out.println("[DEBUG] AuthService - Found by email: " + byEmail.isPresent());
 
         NguoiDung user = byAzureId.or(() -> byEmail)
                 .filter(candidate -> candidate.getTrangThai() != null && candidate.getTrangThai() == 1)
-                .orElseGet(() -> {
-                    System.out.println("[DEBUG] AuthService - User not found, creating new user");
-                    NguoiDung newUser = new NguoiDung();
-                    newUser.setUserName(azureUserInfo.username());
-                    newUser.setHoTen(azureUserInfo.displayName());
-                    newUser.setEmail(azureUserInfo.email());
-                    newUser.setAzureAdId(azureUserInfo.azureAdId());
-                    newUser.setTrangThai(1);
-                    newUser.setNgayTao(LocalDateTime.now());
-                    newUser.setLanDangNhapCuoi(LocalDateTime.now());
-                    NguoiDung saved = nguoiDungRepository.save(newUser);
-                    System.out.println("[DEBUG] AuthService - New user created with ID: " + saved.getId());
-                    return saved;
-                });
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        ErrorCode.AZURE_AUTH_FAILED,
+                        "Azure account is not linked with an active user"
+                ));
 
         user.setAzureAdId(azureUserInfo.azureAdId());
         user.setLanDangNhapCuoi(LocalDateTime.now());
         user.setNgayCapNhat(LocalDateTime.now());
-        NguoiDung savedUser = nguoiDungRepository.save(user);
-        System.out.println("[DEBUG] AuthService - User updated/saved, ID: " + savedUser.getId());
+        nguoiDungRepository.save(user);
 
-        System.out.println("[DEBUG] AuthService - Issuing auth tokens for user: " + savedUser.getUserName());
         AuthTokenResponse response = issueAuthTokenResponse(user);
-        System.out.println("[DEBUG] AuthService - Token response generated, access token (first 50): " +
-                response.accessToken().substring(0, Math.min(50, response.accessToken().length())) + "...");
-        System.out.println("[DEBUG] AuthService - User in response: " + response.user());
-
         auditLogService.log(user.getId(), user.getHoTen(), "AZURE_LOGIN", "NguoiDung",
                 user.getId(), "Azure login", ipAddress, 1);
-        System.out.println("[DEBUG] AuthService - Audit log saved, returning response");
         return response;
     }
 

@@ -83,7 +83,7 @@ public class WorkflowController {
 
     @GetMapping("/approvals/pending")
     public ApiResponse<?> getPendingApprovals(
-            @RequestParam Long nguoiDuyetId,
+            @RequestParam(required = false) Long nguoiDuyetId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,

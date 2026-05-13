@@ -25,13 +25,9 @@ export const refreshToken = (refreshTokenValue: string) =>
     refreshToken: refreshTokenValue,
   });
 
-export const loginAzure = (authorizationCode: string, redirectUri: string) =>
+export const loginAzure = (authorizationCode: string, redirectUri: string, codeVerifier?: string) =>
   apiPost<AuthTokens & { user: AuthUser }>("/api/auth/login/azure", {
     authorizationCode,
     redirectUri,
-  }, { auth: false });
-
-export const loginAzureWithToken = (accessToken: string) =>
-  apiPost<AuthTokens & { user: AuthUser }>("/api/auth/login/azure", {
-    accessToken,
+    code_verifier: codeVerifier || "",
   }, { auth: false });

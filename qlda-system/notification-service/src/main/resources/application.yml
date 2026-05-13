@@ -15,7 +15,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   jackson:
     time-zone: Asia/Ho_Chi_Minh

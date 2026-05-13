@@ -15,7 +15,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        physical_naming_strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   jackson:
     time-zone: Asia/Ho_Chi_Minh
@@ -52,9 +51,9 @@ auth:
     directory: ${AUTH_BACKUP_DIRECTORY:./backups}
 
   azure:
-    tenant-id: ${AZURE_TENANT_ID:42350984-d0f6-4a38-978a-aa84e495e429}
-    client-id: ${AZURE_CLIENT_ID:22761552-d913-4b03-8db9-30bbe55c7742}
-    client-secret: ${AZURE_CLIENT_SECRET:af90419b-5d62-4d49-9936-c9eff9f6ca49}
+    tenant-id: ${AZURE_TENANT_ID:}
+    client-id: ${AZURE_CLIENT_ID:}
+    client-secret: ${AZURE_CLIENT_SECRET:}
 
   office365:
     tenant-id: ${OFFICE365_TENANT_ID:}
