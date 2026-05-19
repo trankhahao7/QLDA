@@ -1,97 +1,63 @@
-import { useState, useEffect } from "react";
-
-interface DocumentType {
-  id: number;
-  maLoai: string;
-  tenLoai: string;
-  moTa: string;
-  suDung: boolean;
-}
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import {
+  createDocumentType,
+  deleteDocumentType,
+  fetchDocumentTypes,
+  updateDocumentType,
+  type DocumentTypeItem,
+} from "../../services/documents/documentTypesApi";
 
 export default function DocumentTypeManagement() {
-  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingType, setEditingType] = useState<DocumentType | null>(null);
+  const [editingType, setEditingType] = useState<DocumentTypeItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [formData, setFormData] = useState({
-    maLoai: "",
-    tenLoai: "",
+    maLoaiVanBan: "",
+    tenLoaiVanBan: "",
     moTa: "",
     suDung: true,
   });
 
   useEffect(() => {
-    fetchDocumentTypes();
-  }, []);
-
-  const fetchDocumentTypes = async () => {
-    try {
-      // Replace with actual API
-      setTimeout(() => {
-        setDocumentTypes([
-          {
-            id: 1,
-            maLoai: "CT",
-            tenLoai: "Công văn",
-            moTa: "Văn bản công vụ thường dùng",
-            suDung: true,
-          },
-          {
-            id: 2,
-            maLoai: "TB",
-            tenLoai: "Thông báo",
-            moTa: "Văn bản thông báo nội bộ",
-            suDung: true,
-          },
-          {
-            id: 3,
-            maLoai: "TT",
-            tenLoai: "Tờ trình",
-            moTa: "Văn bản trình báo cáo",
-            suDung: true,
-          },
-          {
-            id: 4,
-            maLoai: "QD",
-            tenLoai: "Quyết định",
-            moTa: "Văn bản quyết định chính thức",
-            suDung: true,
-          },
-          {
-            id: 5,
-            maLoai: "BN",
-            tenLoai: "Biên bản",
-            moTa: "Văn bản ghi chép kết quả họp",
-            suDung: true,
-          },
-        ]);
+    const loadTypes = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchDocumentTypes({ keyword: searchTerm || undefined });
+        setDocumentTypes(data || []);
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải loại văn bản";
+        setError(message);
+      } finally {
         setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching document types:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadTypes();
+  }, []);
 
   const handleAddType = () => {
     setEditingType(null);
     setFormData({
-      maLoai: "",
-      tenLoai: "",
+      maLoaiVanBan: "",
+      tenLoaiVanBan: "",
       moTa: "",
       suDung: true,
     });
     setShowForm(true);
   };
 
-  const handleEditType = (type: DocumentType) => {
+  const handleEditType = (type: DocumentTypeItem) => {
     setEditingType(type);
     setFormData({
-      maLoai: type.maLoai,
-      tenLoai: type.tenLoai,
-      moTa: type.moTa,
+      maLoaiVanBan: type.maLoaiVanBan,
+      tenLoaiVanBan: type.tenLoaiVanBan,
+      moTa: type.moTa || "",
       suDung: type.suDung,
     });
     setShowForm(true);
@@ -99,15 +65,29 @@ export default function DocumentTypeManagement() {
 
   const handleSaveType = async () => {
     try {
-      if (!formData.maLoai || !formData.tenLoai) {
+      if (!formData.maLoaiVanBan || !formData.tenLoaiVanBan) {
         alert("Vui lòng điền đầy đủ thông tin!");
         return;
       }
 
-      // Replace with actual API
-      console.log("Saving document type:", formData);
+      if (editingType) {
+        await updateDocumentType(editingType.id, {
+          tenLoaiVanBan: formData.tenLoaiVanBan,
+          moTa: formData.moTa,
+          suDung: formData.suDung,
+        });
+      } else {
+        await createDocumentType({
+          maLoaiVanBan: formData.maLoaiVanBan,
+          tenLoaiVanBan: formData.tenLoaiVanBan,
+          moTa: formData.moTa,
+          suDung: formData.suDung,
+        });
+      }
+
       setShowForm(false);
-      await fetchDocumentTypes();
+      const data = await fetchDocumentTypes({ keyword: searchTerm || undefined });
+      setDocumentTypes(data || []);
     } catch (error) {
       console.error("Error saving document type:", error);
     }
@@ -116,24 +96,33 @@ export default function DocumentTypeManagement() {
   const handleDeleteType = async (id: number) => {
     if (confirm("Bạn chắc chắn muốn xóa loại văn bản này?")) {
       try {
-        // Replace with actual API
-        console.log("Deleting document type:", id);
-        await fetchDocumentTypes();
+        await deleteDocumentType(id);
+        const data = await fetchDocumentTypes({ keyword: searchTerm || undefined });
+        setDocumentTypes(data || []);
       } catch (error) {
         console.error("Error deleting document type:", error);
       }
     }
   };
 
-  const filteredTypes = documentTypes.filter(
-    (type) =>
-      type.tenLoai.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      type.maLoai.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTypes = useMemo(() => {
+    if (!searchTerm) return documentTypes;
+    return documentTypes.filter(
+      (type) =>
+        type.tenLoaiVanBan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        type.maLoaiVanBan.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [documentTypes, searchTerm]);
 
   if (loading) {
     return (
       <div className="admin-loading">Đang tải loại văn bản...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-loading">{error}</div>
     );
   }
 
@@ -172,11 +161,11 @@ export default function DocumentTypeManagement() {
                 <label>Mã loại văn bản *</label>
                 <input
                   type="text"
-                  value={formData.maLoai}
+                  value={formData.maLoaiVanBan}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      maLoai: e.target.value.toUpperCase(),
+                      maLoaiVanBan: e.target.value.toUpperCase(),
                     })
                   }
                   disabled={!!editingType}
@@ -188,9 +177,9 @@ export default function DocumentTypeManagement() {
                 <label>Tên loại văn bản *</label>
                 <input
                   type="text"
-                  value={formData.tenLoai}
+                  value={formData.tenLoaiVanBan}
                   onChange={(e) =>
-                    setFormData({ ...formData, tenLoai: e.target.value })
+                    setFormData({ ...formData, tenLoaiVanBan: e.target.value })
                   }
                   placeholder="VD: Công văn, Thông báo..."
                   className="form-input"
@@ -254,9 +243,9 @@ export default function DocumentTypeManagement() {
           {filteredTypes.map((type) => (
             <tr key={type.id}>
               <td>
-                <span className="code-badge">{type.maLoai}</span>
+                <span className="code-badge">{type.maLoaiVanBan}</span>
               </td>
-              <td>{type.tenLoai}</td>
+              <td>{type.tenLoaiVanBan}</td>
               <td className="text-truncate">{type.moTa}</td>
               <td>
                 <span

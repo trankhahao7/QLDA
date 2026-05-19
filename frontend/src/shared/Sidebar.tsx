@@ -5,7 +5,6 @@ const navItems = [
   { to: "/inbox", label: "Văn bản đến" },
   { to: "/upload", label: "Tải lên" },
   { to: "/search", label: "Tìm kiếm" },
-  { to: "/projects", label: "Dự án" },
   { to: "/profile", label: "Tài khoản" },
 ];
 

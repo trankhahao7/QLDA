@@ -1,27 +1,36 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
+import {
+  createWorkflow,
+  createWorkflowStep,
+  deleteWorkflow,
+  fetchWorkflowDetail,
+  fetchWorkflows,
+  updateWorkflow,
+  type WorkflowDetail,
+} from "../../services/workflows/workflowsApi";
 
-interface WorkflowStep {
-  id: number;
+type Workflow = WorkflowDetail;
+
+type WorkflowStepForm = {
   order: number;
   name: string;
   role: string;
   timeAllowed: number;
   required: boolean;
-}
+};
 
-interface Workflow {
+type DocumentTypeOption = {
   id: number;
-  maQuyTrinh: string;
-  tenQuyTrinh: string;
-  loaiVanBan: string;
-  soBuoc: number;
-  suDung: boolean;
-  steps: WorkflowStep[];
-}
+  tenLoaiVanBan: string;
+};
 
 export default function WorkflowManagement() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [expandedWorkflow, setExpandedWorkflow] = useState<number | null>(null);
@@ -29,95 +38,45 @@ export default function WorkflowManagement() {
   const [formData, setFormData] = useState({
     maQuyTrinh: "",
     tenQuyTrinh: "",
-    loaiVanBan: "",
+    loaiVanBanId: undefined as number | undefined,
     suDung: true,
-    steps: [] as Omit<WorkflowStep, "id">[],
+    steps: [] as WorkflowStepForm[],
   });
 
   useEffect(() => {
-    fetchWorkflows();
-  }, []);
-
-  const fetchWorkflows = async () => {
-    try {
-      // Replace with actual API
-      setTimeout(() => {
-        setWorkflows([
-          {
-            id: 1,
-            maQuyTrinh: "QT001",
-            tenQuyTrinh: "Quy trình phê duyệt công văn",
-            loaiVanBan: "Công văn",
-            soBuoc: 3,
-            suDung: true,
-            steps: [
-              {
-                id: 1,
-                order: 1,
-                name: "Tiếp nhận",
-                role: "Người dùng",
-                timeAllowed: 1,
-                required: false,
-              },
-              {
-                id: 2,
-                order: 2,
-                name: "Phê duyệt sơ bộ",
-                role: "Trưởng phòng",
-                timeAllowed: 2,
-                required: true,
-              },
-              {
-                id: 3,
-                order: 3,
-                name: "Phê duyệt cuối cùng",
-                role: "Giám đốc",
-                timeAllowed: 1,
-                required: true,
-              },
-            ],
-          },
-          {
-            id: 2,
-            maQuyTrinh: "QT002",
-            tenQuyTrinh: "Quy trình xử lý thông báo",
-            loaiVanBan: "Thông báo",
-            soBuoc: 2,
-            suDung: true,
-            steps: [
-              {
-                id: 4,
-                order: 1,
-                name: "Soạn thảo",
-                role: "Người dùng",
-                timeAllowed: 1,
-                required: false,
-              },
-              {
-                id: 5,
-                order: 2,
-                name: "Phê duyệt",
-                role: "Trưởng phòng",
-                timeAllowed: 1,
-                required: true,
-              },
-            ],
-          },
+    const loadWorkflows = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [workflowResponse, typesResponse] = await Promise.all([
+          fetchWorkflows({ page: 0, size: 50 }),
+          fetchDocumentTypes({}),
         ]);
+
+        setWorkflows(workflowResponse.content || []);
+        setDocumentTypes(
+          (typesResponse || []).map((item) => ({
+            id: item.id,
+            tenLoaiVanBan: item.tenLoaiVanBan,
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải quy trình";
+        setError(message);
+      } finally {
         setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching workflows:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadWorkflows();
+  }, []);
 
   const handleAddWorkflow = () => {
     setEditingWorkflow(null);
     setFormData({
       maQuyTrinh: "",
       tenQuyTrinh: "",
-      loaiVanBan: "",
+      loaiVanBanId: undefined,
       suDung: true,
       steps: [
         { order: 1, name: "", role: "USER", timeAllowed: 1, required: false },
@@ -126,16 +85,27 @@ export default function WorkflowManagement() {
     setShowForm(true);
   };
 
-  const handleEditWorkflow = (workflow: Workflow) => {
-    setEditingWorkflow(workflow);
-    setFormData({
-      maQuyTrinh: workflow.maQuyTrinh,
-      tenQuyTrinh: workflow.tenQuyTrinh,
-      loaiVanBan: workflow.loaiVanBan,
-      suDung: workflow.suDung,
-      steps: workflow.steps.map(({ id, ...step }) => step),
-    });
-    setShowForm(true);
+  const handleEditWorkflow = async (workflow: Workflow) => {
+    try {
+      const detail = await fetchWorkflowDetail(workflow.id);
+      setEditingWorkflow(detail);
+      setFormData({
+        maQuyTrinh: detail.maQuyTrinh,
+        tenQuyTrinh: detail.tenQuyTrinh,
+        loaiVanBanId: detail.loaiVanBanId,
+        suDung: detail.suDung,
+        steps: (detail.steps || []).map((step) => ({
+          order: step.thuTuBuoc,
+          name: step.tenBuoc,
+          role: step.vaiTroXuLy || "",
+          timeAllowed: step.thoiGianXuLy || 1,
+          required: Boolean(step.batBuocPheDuyet),
+        })),
+      });
+      setShowForm(true);
+    } catch (error) {
+      console.error("Error loading workflow detail:", error);
+    }
   };
 
   const handleAddStep = () => {
@@ -168,10 +138,35 @@ export default function WorkflowManagement() {
         return;
       }
 
-      // Replace with actual API
-      console.log("Saving workflow:", formData);
+      if (editingWorkflow) {
+        await updateWorkflow(editingWorkflow.id, {
+          tenQuyTrinh: formData.tenQuyTrinh,
+          loaiVanBanId: formData.loaiVanBanId,
+          suDung: formData.suDung,
+        });
+        // TODO: cập nhật từng bước khi backend hỗ trợ batch update.
+      } else {
+        const created = await createWorkflow({
+          maQuyTrinh: formData.maQuyTrinh,
+          tenQuyTrinh: formData.tenQuyTrinh,
+          loaiVanBanId: formData.loaiVanBanId,
+          suDung: formData.suDung,
+        });
+
+        for (const step of formData.steps) {
+          await createWorkflowStep(created.id, {
+            tenBuoc: step.name,
+            thuTuBuoc: step.order,
+            vaiTroXuLy: step.role,
+            thoiGianXuLy: step.timeAllowed,
+            batBuocPheDuyet: step.required,
+          });
+        }
+      }
+
       setShowForm(false);
-      await fetchWorkflows();
+      const response = await fetchWorkflows({ page: 0, size: 50 });
+      setWorkflows(response.content || []);
     } catch (error) {
       console.error("Error saving workflow:", error);
     }
@@ -180,18 +175,47 @@ export default function WorkflowManagement() {
   const handleDeleteWorkflow = async (id: number) => {
     if (confirm("Bạn chắc chắn muốn xóa quy trình này?")) {
       try {
-        // Replace with actual API
-        console.log("Deleting workflow:", id);
-        await fetchWorkflows();
+        await deleteWorkflow(id);
+        const response = await fetchWorkflows({ page: 0, size: 50 });
+        setWorkflows(response.content || []);
       } catch (error) {
         console.error("Error deleting workflow:", error);
       }
     }
   };
 
+  const handleToggleWorkflow = async (workflow: Workflow) => {
+    if (expandedWorkflow === workflow.id) {
+      setExpandedWorkflow(null);
+      return;
+    }
+
+    setExpandedWorkflow(workflow.id);
+    if (!workflow.steps || workflow.steps.length === 0) {
+      try {
+        const detail = await fetchWorkflowDetail(workflow.id);
+        setWorkflows((prev) =>
+          prev.map((item) => (item.id === workflow.id ? detail : item))
+        );
+      } catch (error) {
+        console.error("Error loading workflow steps:", error);
+      }
+    }
+  };
+
+  const typeNameById = useMemo(() => {
+    return new Map(documentTypes.map((type) => [type.id, type.tenLoaiVanBan]));
+  }, [documentTypes]);
+
   if (loading) {
     return (
       <div className="admin-loading">Đang tải quy trình...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-loading">{error}</div>
     );
   }
 
@@ -253,19 +277,21 @@ export default function WorkflowManagement() {
                 <div className="form-group">
                   <label>Loại văn bản</label>
                   <select
-                    value={formData.loaiVanBan}
+                    value={formData.loaiVanBanId ?? ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        loaiVanBan: e.target.value,
+                        loaiVanBanId: e.target.value ? Number(e.target.value) : undefined,
                       })
                     }
                     className="form-input"
                   >
                     <option value="">Chọn loại văn bản</option>
-                    <option value="Công văn">Công văn</option>
-                    <option value="Thông báo">Thông báo</option>
-                    <option value="Quyết định">Quyết định</option>
+                    {documentTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.tenLoaiVanBan}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group checkbox">
@@ -322,14 +348,13 @@ export default function WorkflowManagement() {
                         value={step.timeAllowed}
                         onChange={(e) => {
                           const newSteps = [...formData.steps];
-                          newSteps[index].timeAllowed =
-                            parseInt(e.target.value) || 1;
+                          newSteps[index].timeAllowed = parseInt(e.target.value) || 1;
                           setFormData({
                             ...formData,
                             steps: newSteps,
                           });
                         }}
-                        placeholder="Thời gian (ngày)"
+                        placeholder="Thời gian (giờ)"
                         className="form-input small"
                       />
                       <label className="checkbox">
@@ -394,11 +419,7 @@ export default function WorkflowManagement() {
               <div className="workflow-info">
                 <h3>{workflow.tenQuyTrinh}</h3>
                 <p className="workflow-meta">
-                  Mã: <span className="code-badge">{workflow.maQuyTrinh}</span>
-                  <span className="separator">•</span>
-                  Loại: {workflow.loaiVanBan}
-                  <span className="separator">•</span>
-                  {workflow.soBuoc} bước
+                  Mã: {workflow.maQuyTrinh} | Loại: {workflow.loaiVanBanId ? typeNameById.get(workflow.loaiVanBanId) : "-"}
                 </p>
               </div>
               <div className="workflow-status">
@@ -412,17 +433,16 @@ export default function WorkflowManagement() {
               </div>
             </div>
 
-            {expandedWorkflow === workflow.id && (
+            {expandedWorkflow === workflow.id && workflow.steps && (
               <div className="workflow-steps">
                 {workflow.steps.map((step) => (
                   <div key={step.id} className="workflow-step">
-                    <span className="step-badge">{step.order}</span>
+                    <span className="step-badge">{step.thuTuBuoc}</span>
                     <div className="step-details">
-                      <p className="step-name">{step.name}</p>
+                      <p className="step-name">{step.tenBuoc}</p>
                       <p className="step-info">
-                        Vai trò: {step.role} • Thời gian: {step.timeAllowed}
-                        {step.timeAllowed > 1 ? " ngày" : " ngày"}
-                        {step.required && " • Bắt buộc"}
+                        Vai trò: {step.vaiTroXuLy || "-"} • Thời gian: {step.thoiGianXuLy || 0} giờ
+                        {step.batBuocPheDuyet && " • Bắt buộc"}
                       </p>
                     </div>
                   </div>
@@ -433,11 +453,7 @@ export default function WorkflowManagement() {
             <div className="workflow-actions">
               <button
                 className="button small"
-                onClick={() =>
-                  setExpandedWorkflow(
-                    expandedWorkflow === workflow.id ? null : workflow.id
-                  )
-                }
+                onClick={() => handleToggleWorkflow(workflow)}
               >
                 {expandedWorkflow === workflow.id ? "Ẩn" : "Xem"} chi tiết
               </button>

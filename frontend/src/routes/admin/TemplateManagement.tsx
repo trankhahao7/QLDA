@@ -1,82 +1,71 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
+import {
+  createTemplate,
+  deleteTemplate,
+  fetchTemplates,
+  updateTemplate,
+  type TemplateItem,
+} from "../../services/documents/templatesApi";
 
-interface Template {
+type DocumentTypeOption = {
   id: number;
-  maTemplate: string;
-  tenTemplate: string;
-  loaiVanBan: string;
-  noiDungMau: string;
-  tepMau: string;
-  suDung: boolean;
-}
+  tenLoaiVanBan: string;
+};
 
 export default function TemplateManagement() {
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<TemplateItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [formData, setFormData] = useState({
     maTemplate: "",
     tenTemplate: "",
-    loaiVanBan: "",
+    loaiVanBanId: undefined as number | undefined,
     noiDungMau: "",
     tepMau: "",
     suDung: true,
   });
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
-
-  const fetchTemplates = async () => {
-    try {
-      // Replace with actual API
-      setTimeout(() => {
-        setTemplates([
-          {
-            id: 1,
-            maTemplate: "TMP001",
-            tenTemplate: "Template công văn hành chính",
-            loaiVanBan: "Công văn",
-            noiDungMau: "Văn phòng chủ tịch ...",
-            tepMau: "template_cv.docx",
-            suDung: true,
-          },
-          {
-            id: 2,
-            maTemplate: "TMP002",
-            tenTemplate: "Template thông báo nội bộ",
-            loaiVanBan: "Thông báo",
-            noiDungMau: "Thông báo số ... năm ...",
-            tepMau: "template_tb.docx",
-            suDung: true,
-          },
-          {
-            id: 3,
-            maTemplate: "TMP003",
-            tenTemplate: "Template quyết định",
-            loaiVanBan: "Quyết định",
-            noiDungMau: "Quyết định số ... năm ...",
-            tepMau: "template_qd.docx",
-            suDung: true,
-          },
+    const loadTemplates = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [templatesResponse, typesResponse] = await Promise.all([
+          fetchTemplates({ page: 0, size: 100, keyword: searchTerm || undefined }),
+          fetchDocumentTypes({}),
         ]);
+
+        setTemplates(templatesResponse.content || []);
+        setDocumentTypes(
+          (typesResponse || []).map((item) => ({
+            id: item.id,
+            tenLoaiVanBan: item.tenLoaiVanBan,
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải template";
+        setError(message);
+      } finally {
         setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching templates:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadTemplates();
+  }, []);
 
   const handleAddTemplate = () => {
     setEditingTemplate(null);
     setFormData({
       maTemplate: "",
       tenTemplate: "",
-      loaiVanBan: "",
+      loaiVanBanId: undefined,
       noiDungMau: "",
       tepMau: "",
       suDung: true,
@@ -84,14 +73,14 @@ export default function TemplateManagement() {
     setShowForm(true);
   };
 
-  const handleEditTemplate = (template: Template) => {
+  const handleEditTemplate = (template: TemplateItem) => {
     setEditingTemplate(template);
     setFormData({
       maTemplate: template.maTemplate,
       tenTemplate: template.tenTemplate,
-      loaiVanBan: template.loaiVanBan,
-      noiDungMau: template.noiDungMau,
-      tepMau: template.tepMau,
+      loaiVanBanId: template.loaiVanBanId,
+      noiDungMau: template.noiDungMau || "",
+      tepMau: template.tepMau || "",
       suDung: template.suDung,
     });
     setShowForm(true);
@@ -99,15 +88,33 @@ export default function TemplateManagement() {
 
   const handleSaveTemplate = async () => {
     try {
-      if (!formData.maTemplate || !formData.tenTemplate) {
+      if (!formData.maTemplate || !formData.tenTemplate || !formData.loaiVanBanId) {
         alert("Vui lòng điền đầy đủ thông tin!");
         return;
       }
 
-      // Replace with actual API
-      console.log("Saving template:", formData);
+      if (editingTemplate) {
+        await updateTemplate(editingTemplate.id, {
+          tenTemplate: formData.tenTemplate,
+          loaiVanBanId: formData.loaiVanBanId,
+          noiDungMau: formData.noiDungMau,
+          tepMau: formData.tepMau,
+          suDung: formData.suDung,
+        });
+      } else {
+        await createTemplate({
+          maTemplate: formData.maTemplate,
+          tenTemplate: formData.tenTemplate,
+          loaiVanBanId: formData.loaiVanBanId,
+          noiDungMau: formData.noiDungMau,
+          tepMau: formData.tepMau,
+          suDung: formData.suDung,
+        });
+      }
+
       setShowForm(false);
-      await fetchTemplates();
+      const templatesResponse = await fetchTemplates({ page: 0, size: 100, keyword: searchTerm || undefined });
+      setTemplates(templatesResponse.content || []);
     } catch (error) {
       console.error("Error saving template:", error);
     }
@@ -116,29 +123,45 @@ export default function TemplateManagement() {
   const handleDeleteTemplate = async (id: number) => {
     if (confirm("Bạn chắc chắn muốn xóa template này?")) {
       try {
-        // Replace with actual API
-        console.log("Deleting template:", id);
-        await fetchTemplates();
+        await deleteTemplate(id);
+        const templatesResponse = await fetchTemplates({ page: 0, size: 100, keyword: searchTerm || undefined });
+        setTemplates(templatesResponse.content || []);
       } catch (error) {
         console.error("Error deleting template:", error);
       }
     }
   };
 
-  const handleDownloadTemplate = (template: Template) => {
-    // Simulate download
-    alert(`Đang tải xuống template: ${template.tepMau}`);
+  const handleDownloadTemplate = (template: TemplateItem) => {
+    if (!template.tepMau) {
+      alert("Template chưa có tệp mẫu để tải.");
+      return;
+    }
+    window.open(template.tepMau, "_blank");
   };
 
-  const filteredTemplates = templates.filter(
-    (template) =>
-      template.tenTemplate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      template.maTemplate.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTemplates = useMemo(() => {
+    if (!searchTerm) return templates;
+    return templates.filter(
+      (template) =>
+        template.tenTemplate.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.maTemplate.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [templates, searchTerm]);
+
+  const typeNameById = useMemo(() => {
+    return new Map(documentTypes.map((type) => [type.id, type.tenLoaiVanBan]));
+  }, [documentTypes]);
 
   if (loading) {
     return (
       <div className="admin-loading">Đang tải template...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-loading">{error}</div>
     );
   }
 
@@ -209,20 +232,21 @@ export default function TemplateManagement() {
               <div className="form-group">
                 <label>Loại văn bản</label>
                 <select
-                  value={formData.loaiVanBan}
+                  value={formData.loaiVanBanId ?? ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      loaiVanBan: e.target.value,
+                      loaiVanBanId: e.target.value ? Number(e.target.value) : undefined,
                     })
                   }
                   className="form-input"
                 >
                   <option value="">Chọn loại văn bản</option>
-                  <option value="Công văn">Công văn</option>
-                  <option value="Thông báo">Thông báo</option>
-                  <option value="Quyết định">Quyết định</option>
-                  <option value="Tờ trình">Tờ trình</option>
+                  {documentTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.tenLoaiVanBan}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
@@ -241,14 +265,14 @@ export default function TemplateManagement() {
                 ></textarea>
               </div>
               <div className="form-group">
-                <label>Tệp mẫu (tên file)</label>
+                <label>Tệp mẫu (URL hoặc tên file)</label>
                 <input
                   type="text"
                   value={formData.tepMau}
                   onChange={(e) =>
                     setFormData({ ...formData, tepMau: e.target.value })
                   }
-                  placeholder="template.docx"
+                  placeholder="/templates/template.docx"
                   className="form-input"
                 />
               </div>
@@ -301,11 +325,13 @@ export default function TemplateManagement() {
               <p className="template-code">
                 Mã: <span className="code-badge">{template.maTemplate}</span>
               </p>
-              <p className="template-type">Loại: {template.loaiVanBan}</p>
-              <p className="template-file">File: {template.tepMau}</p>
+              <p className="template-type">
+                Loại: {template.tenLoaiVanBan || (template.loaiVanBanId ? typeNameById.get(template.loaiVanBanId) : "-") || "-"}
+              </p>
+              <p className="template-file">File: {template.tepMau || "-"}</p>
               <div className="template-preview">
                 <p className="preview-text">
-                  {template.noiDungMau.substring(0, 100)}...
+                  {(template.noiDungMau || "").substring(0, 100)}...
                 </p>
               </div>
             </div>

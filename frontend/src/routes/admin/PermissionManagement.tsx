@@ -1,108 +1,98 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchRoles, type RoleItem } from "../../services/auth/rolesApi";
+import {
+  fetchRolePermissions,
+  updateRolePermissions,
+  type RolePermissionItem,
+} from "../../services/auth/permissionsApi";
 
-interface Permission {
-  id: number;
-  nhomQuyen: string;
-  chucNang: string;
-  view: boolean;
-  create: boolean;
-  edit: boolean;
-  delete: boolean;
-  approve: boolean;
-}
-
-interface RolePermissions {
-  nhomQuyen: string;
-  permissions: Permission[];
-}
+type RolePermissionsState = {
+  roleId: number;
+  roleName: string;
+  permissions: RolePermissionItem[];
+};
 
 export default function PermissionManagement() {
-  const [roles, setRoles] = useState<RolePermissions[]>([]);
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [rolePermissions, setRolePermissions] = useState<RolePermissionsState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<string>("");
-
-  const features = [
-    "Quản lý văn bản",
-    "Duyệt văn bản",
-    "Quản lý quy trình",
-    "Quản lý người dùng",
-    "Quản lý báo cáo",
-    "Tích hợp Office 365",
-    "AI Xử lý",
-  ];
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPermissions();
+    const loadRoles = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchRoles({ page: 0, size: 100 });
+        const roleItems = response.content || [];
+        setRoles(roleItems);
+        if (roleItems.length > 0) {
+          setSelectedRoleId(roleItems[0].id);
+        }
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải danh sách quyền";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRoles();
   }, []);
 
-  const fetchPermissions = async () => {
-    try {
-      // Replace with actual API
-      setTimeout(() => {
-        setRoles([
-          {
-            nhomQuyen: "ADMIN",
-            permissions: features.map((feature, index) => ({
-              id: index,
-              nhomQuyen: "ADMIN",
-              chucNang: feature,
-              view: true,
-              create: true,
-              edit: true,
-              delete: true,
-              approve: true,
-            })),
-          },
-          {
-            nhomQuyen: "APPROVER",
-            permissions: features.map((feature, index) => ({
-              id: index,
-              nhomQuyen: "APPROVER",
-              chucNang: feature,
-              view: true,
-              create: feature !== "Quản lý người dùng",
-              edit: feature !== "Quản lý người dùng",
-              delete: false,
-              approve: true,
-            })),
-          },
-          {
-            nhomQuyen: "USER",
-            permissions: features.map((feature, index) => ({
-              id: index,
-              nhomQuyen: "USER",
-              chucNang: feature,
-              view: true,
-              create: feature === "Quản lý văn bản",
-              edit: feature === "Quản lý văn bản",
-              delete: false,
-              approve: false,
-            })),
-          },
-        ]);
+  useEffect(() => {
+    if (!selectedRoleId) return;
+
+    const loadPermissions = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchRolePermissions(selectedRoleId);
+        setRolePermissions({
+          roleId: response.roleId,
+          roleName: response.tenNhomQuyen,
+          permissions: response.permissions,
+        });
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải phân quyền";
+        setError(message);
+      } finally {
         setLoading(false);
-        setSelectedRole("ADMIN");
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching permissions:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadPermissions();
+  }, [selectedRoleId]);
 
   const handlePermissionChange = (
-    roleIndex: number,
     permissionIndex: number,
-    field: keyof Omit<Permission, "id" | "nhomQuyen" | "chucNang">
+    field: keyof Omit<RolePermissionItem, "id" | "chucNangId" | "maChucNang" | "tenChucNang">
   ) => {
-    const newRoles = [...roles];
-    (newRoles[roleIndex].permissions[permissionIndex][field] as boolean) = !newRoles[roleIndex].permissions[permissionIndex][field];
-    setRoles(newRoles);
+    if (!rolePermissions) return;
+    const updated = [...rolePermissions.permissions];
+    updated[permissionIndex] = {
+      ...updated[permissionIndex],
+      [field]: !updated[permissionIndex][field],
+    };
+    setRolePermissions({ ...rolePermissions, permissions: updated });
   };
 
   const handleSavePermissions = async () => {
+    if (!rolePermissions) return;
     try {
-      // Replace with actual API
-      console.log("Saving permissions:", roles);
+      await updateRolePermissions(
+        rolePermissions.roleId,
+        rolePermissions.permissions.map((perm) => ({
+          chucNangId: perm.chucNangId,
+          isView: perm.isView,
+          isCreate: perm.isCreate,
+          isEdit: perm.isEdit,
+          isDelete: perm.isDelete,
+          isApprove: perm.isApprove,
+        }))
+      );
       alert("Lưu quyền hạn thành công!");
     } catch (error) {
       console.error("Error saving permissions:", error);
@@ -110,11 +100,15 @@ export default function PermissionManagement() {
     }
   };
 
+  const currentPermissions = useMemo(() => rolePermissions?.permissions || [], [rolePermissions]);
+
   if (loading) {
     return <div className="admin-loading">Đang tải phân quyền...</div>;
   }
 
-  const currentRoleData = roles.find((r) => r.nhomQuyen === selectedRole);
+  if (error) {
+    return <div className="admin-loading">{error}</div>;
+  }
 
   return (
     <div className="admin-section">
@@ -123,6 +117,7 @@ export default function PermissionManagement() {
         <button
           className="button primary"
           onClick={handleSavePermissions}
+          disabled={!rolePermissions}
         >
           💾 Lưu thay đổi
         </button>
@@ -133,17 +128,17 @@ export default function PermissionManagement() {
         <div className="role-tabs">
           {roles.map((role) => (
             <button
-              key={role.nhomQuyen}
-              className={`tab ${selectedRole === role.nhomQuyen ? "active" : ""}`}
-              onClick={() => setSelectedRole(role.nhomQuyen)}
+              key={role.id}
+              className={`tab ${selectedRoleId === role.id ? "active" : ""}`}
+              onClick={() => setSelectedRoleId(role.id)}
             >
-              {role.nhomQuyen}
+              {role.tenNhomQuyen}
             </button>
           ))}
         </div>
       </div>
 
-      {currentRoleData && (
+      {rolePermissions && (
         <div className="permissions-table-wrapper">
           <table className="permissions-table">
             <thead>
@@ -157,72 +152,42 @@ export default function PermissionManagement() {
               </tr>
             </thead>
             <tbody>
-              {currentRoleData.permissions.map((perm, index) => (
+              {currentPermissions.map((perm, index) => (
                 <tr key={perm.id}>
-                  <td className="feature-name">{perm.chucNang}</td>
+                  <td className="feature-name">{perm.tenChucNang}</td>
                   <td>
                     <input
                       type="checkbox"
-                      checked={perm.view}
-                      onChange={() =>
-                        handlePermissionChange(
-                          roles.findIndex((r) => r.nhomQuyen === selectedRole),
-                          index,
-                          "view"
-                        )
-                      }
+                      checked={perm.isView}
+                      onChange={() => handlePermissionChange(index, "isView")}
                     />
                   </td>
                   <td>
                     <input
                       type="checkbox"
-                      checked={perm.create}
-                      onChange={() =>
-                        handlePermissionChange(
-                          roles.findIndex((r) => r.nhomQuyen === selectedRole),
-                          index,
-                          "create"
-                        )
-                      }
+                      checked={perm.isCreate}
+                      onChange={() => handlePermissionChange(index, "isCreate")}
                     />
                   </td>
                   <td>
                     <input
                       type="checkbox"
-                      checked={perm.edit}
-                      onChange={() =>
-                        handlePermissionChange(
-                          roles.findIndex((r) => r.nhomQuyen === selectedRole),
-                          index,
-                          "edit"
-                        )
-                      }
+                      checked={perm.isEdit}
+                      onChange={() => handlePermissionChange(index, "isEdit")}
                     />
                   </td>
                   <td>
                     <input
                       type="checkbox"
-                      checked={perm.delete}
-                      onChange={() =>
-                        handlePermissionChange(
-                          roles.findIndex((r) => r.nhomQuyen === selectedRole),
-                          index,
-                          "delete"
-                        )
-                      }
+                      checked={perm.isDelete}
+                      onChange={() => handlePermissionChange(index, "isDelete")}
                     />
                   </td>
                   <td>
                     <input
                       type="checkbox"
-                      checked={perm.approve}
-                      onChange={() =>
-                        handlePermissionChange(
-                          roles.findIndex((r) => r.nhomQuyen === selectedRole),
-                          index,
-                          "approve"
-                        )
-                      }
+                      checked={perm.isApprove}
+                      onChange={() => handlePermissionChange(index, "isApprove")}
                     />
                   </td>
                 </tr>

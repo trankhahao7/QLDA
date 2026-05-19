@@ -1,121 +1,107 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchRoles } from "../../services/auth/rolesApi";
+import { fetchUnits } from "../../services/units/unitsApi";
+import {
+  createUser,
+  deleteUser,
+  fetchUsers,
+  updateUser,
+  type UserItem,
+} from "../../services/auth/usersApi";
 
-interface User {
+type UnitOption = {
   id: number;
-  userName: string;
-  hoTen: string;
-  email: string;
-  dienThoai: string;
-  donVi: string;
-  chucVu: string;
-  nhomQuyen: string;
-  trangThai: number;
-  ngayTao: string;
-}
+  tenDonVi: string;
+};
+
+type RoleOption = {
+  id: number;
+  tenNhomQuyen: string;
+};
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterUnit, setFilterUnit] = useState("");
+  const [filterUnit, setFilterUnit] = useState<number | "">("");
+  const [units, setUnits] = useState<UnitOption[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
 
   const [formData, setFormData] = useState({
-    userName: "",
+    username: "",
     hoTen: "",
     email: "",
     dienThoai: "",
-    donVi: "",
+    donViId: undefined as number | undefined,
     chucVu: "",
-    nhomQuyen: "USER",
+    nhomQuyenId: undefined as number | undefined,
     trangThai: 1,
   });
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      // Replace with actual API
-      // const response = await fetch('/api/users');
-      // const data = await response.json();
-      // setUsers(data);
-
-      // Mock data
-      setTimeout(() => {
-        setUsers([
-          {
-            id: 1,
-            userName: "nguyenvana",
-            hoTen: "Nguyễn Văn A",
-            email: "a@example.com",
-            dienThoai: "0912345678",
-            donVi: "Phòng IT",
-            chucVu: "Trưởng phòng",
-            nhomQuyen: "ADMIN",
-            trangThai: 1,
-            ngayTao: "2024-01-15",
-          },
-          {
-            id: 2,
-            userName: "tranthib",
-            hoTen: "Trần Thị B",
-            email: "b@example.com",
-            dienThoai: "0912345679",
-            donVi: "Phòng Nhân sự",
-            chucVu: "Nhân viên",
-            nhomQuyen: "USER",
-            trangThai: 1,
-            ngayTao: "2024-02-20",
-          },
-          {
-            id: 3,
-            userName: "levanc",
-            hoTen: "Lê Văn C",
-            email: "c@example.com",
-            dienThoai: "0912345680",
-            donVi: "Phòng Tài chính",
-            chucVu: "Kế toán trưởng",
-            nhomQuyen: "APPROVER",
-            trangThai: 1,
-            ngayTao: "2024-03-10",
-          },
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [usersResponse, unitsResponse, rolesResponse] = await Promise.all([
+          fetchUsers({ page: 0, size: 50 }),
+          fetchUnits({ page: 0, size: 200 }),
+          fetchRoles({ page: 0, size: 200 }),
         ]);
+
+        setUsers(usersResponse.content || []);
+        setUnits(
+          (unitsResponse.content || []).map((unit) => ({
+            id: unit.id,
+            tenDonVi: unit.tenDonVi,
+          }))
+        );
+        setRoles(
+          (rolesResponse.content || []).map((role) => ({
+            id: role.id,
+            tenNhomQuyen: role.tenNhomQuyen,
+          }))
+        );
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải dữ liệu";
+        setError(message);
+      } finally {
         setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleAddUser = () => {
     setEditingUser(null);
     setFormData({
-      userName: "",
+      username: "",
       hoTen: "",
       email: "",
       dienThoai: "",
-      donVi: "",
+      donViId: undefined,
       chucVu: "",
-      nhomQuyen: "USER",
+      nhomQuyenId: undefined,
       trangThai: 1,
     });
     setShowForm(true);
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: UserItem) => {
     setEditingUser(user);
     setFormData({
-      userName: user.userName,
+      username: user.username,
       hoTen: user.hoTen,
       email: user.email,
-      dienThoai: user.dienThoai,
-      donVi: user.donVi,
-      chucVu: user.chucVu,
-      nhomQuyen: user.nhomQuyen,
+      dienThoai: user.dienThoai || "",
+      donViId: user.donViId,
+      chucVu: user.chucVu || "",
+      nhomQuyenId: user.nhomQuyenId,
       trangThai: user.trangThai,
     });
     setShowForm(true);
@@ -123,25 +109,31 @@ export default function UserManagement() {
 
   const handleSaveUser = async () => {
     try {
-      // Replace with actual API
       if (editingUser) {
-        // await fetch(`/api/users/${editingUser.id}`, {
-        //   method: 'PUT',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(formData),
-        // });
-        console.log("Updating user:", formData);
+        await updateUser(editingUser.id, {
+          hoTen: formData.hoTen,
+          email: formData.email,
+          dienThoai: formData.dienThoai,
+          donViId: formData.donViId,
+          chucVu: formData.chucVu,
+          nhomQuyenId: formData.nhomQuyenId,
+          trangThai: formData.trangThai,
+        });
       } else {
-        // await fetch('/api/users', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(formData),
-        // });
-        console.log("Creating user:", formData);
+        await createUser({
+          username: formData.username,
+          hoTen: formData.hoTen,
+          email: formData.email,
+          dienThoai: formData.dienThoai,
+          donViId: formData.donViId,
+          chucVu: formData.chucVu,
+          nhomQuyenId: formData.nhomQuyenId,
+        });
       }
 
       setShowForm(false);
-      await fetchUsers();
+      const response = await fetchUsers({ page: 0, size: 50 });
+      setUsers(response.content || []);
     } catch (error) {
       console.error("Error saving user:", error);
     }
@@ -150,24 +142,32 @@ export default function UserManagement() {
   const handleDeleteUser = async (id: number) => {
     if (confirm("Bạn chắc chắn muốn xóa người dùng này?")) {
       try {
-        // await fetch(`/api/users/${id}`, { method: 'DELETE' });
-        console.log("Deleting user:", id);
-        await fetchUsers();
+        await deleteUser(id);
+        const response = await fetchUsers({ page: 0, size: 50 });
+        setUsers(response.content || []);
       } catch (error) {
         console.error("Error deleting user:", error);
       }
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.hoTen.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (filterUnit === "" || user.donVi === filterUnit)
-  );
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm && filterUnit === "") return users;
+    return users.filter((user) => {
+      const matchesKeyword =
+        user.hoTen.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesUnit = filterUnit === "" || user.donViId === filterUnit;
+      return matchesKeyword && matchesUnit;
+    });
+  }, [users, searchTerm, filterUnit]);
 
   if (loading) {
     return <div className="admin-loading">Đang tải danh sách người dùng...</div>;
+  }
+
+  if (error) {
+    return <div className="admin-loading">{error}</div>;
   }
 
   return (
@@ -192,13 +192,15 @@ export default function UserManagement() {
         />
         <select
           value={filterUnit}
-          onChange={(e) => setFilterUnit(e.target.value)}
+          onChange={(e) => setFilterUnit(e.target.value ? Number(e.target.value) : "")}
           className="filter-select"
         >
           <option value="">Tất cả đơn vị</option>
-          <option value="Phòng IT">Phòng IT</option>
-          <option value="Phòng Nhân sự">Phòng Nhân sự</option>
-          <option value="Phòng Tài chính">Phòng Tài chính</option>
+          {units.map((unit) => (
+            <option key={unit.id} value={unit.id}>
+              {unit.tenDonVi}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -211,9 +213,9 @@ export default function UserManagement() {
                 <label>Tên đăng nhập</label>
                 <input
                   type="text"
-                  value={formData.userName}
+                  value={formData.username}
                   onChange={(e) =>
-                    setFormData({ ...formData, userName: e.target.value })
+                    setFormData({ ...formData, username: e.target.value })
                   }
                   disabled={!!editingUser}
                   className="form-input"
@@ -258,16 +260,21 @@ export default function UserManagement() {
                 <div className="form-group">
                   <label>Đơn vị</label>
                   <select
-                    value={formData.donVi}
+                    value={formData.donViId ?? ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, donVi: e.target.value })
+                      setFormData({
+                        ...formData,
+                        donViId: e.target.value ? Number(e.target.value) : undefined,
+                      })
                     }
                     className="form-input"
                   >
                     <option value="">Chọn đơn vị</option>
-                    <option value="Phòng IT">Phòng IT</option>
-                    <option value="Phòng Nhân sự">Phòng Nhân sự</option>
-                    <option value="Phòng Tài chính">Phòng Tài chính</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.tenDonVi}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
@@ -286,15 +293,21 @@ export default function UserManagement() {
                 <div className="form-group">
                   <label>Nhóm quyền</label>
                   <select
-                    value={formData.nhomQuyen}
+                    value={formData.nhomQuyenId ?? ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, nhomQuyen: e.target.value })
+                      setFormData({
+                        ...formData,
+                        nhomQuyenId: e.target.value ? Number(e.target.value) : undefined,
+                      })
                     }
                     className="form-input"
                   >
-                    <option value="USER">Người dùng</option>
-                    <option value="APPROVER">Người phê duyệt</option>
-                    <option value="ADMIN">Quản trị viên</option>
+                    <option value="">Chọn nhóm quyền</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.tenNhomQuyen}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
@@ -350,12 +363,12 @@ export default function UserManagement() {
         <tbody>
           {filteredUsers.map((user) => (
             <tr key={user.id}>
-              <td>{user.userName}</td>
+              <td>{user.username}</td>
               <td>{user.hoTen}</td>
               <td>{user.email}</td>
-              <td>{user.donVi}</td>
+              <td>{user.tenDonVi || "-"}</td>
               <td>
-                <span className="badge badge-info">{user.nhomQuyen}</span>
+                <span className="badge badge-info">{user.tenNhomQuyen || "-"}</span>
               </td>
               <td>
                 <span

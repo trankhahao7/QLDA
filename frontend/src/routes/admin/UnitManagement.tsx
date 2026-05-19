@@ -1,19 +1,23 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { createUnit, deleteUnit, fetchUnits, updateUnit } from "../../services/units/unitsApi";
 
 interface Unit {
   id: number;
   maDonVi: string;
   tenDonVi: string;
-  donViCha: string | null;
-  dienThoai: string;
-  email: string;
-  diaChi: string;
+  donViChaId?: number | null;
+  tenDonViCha?: string | null;
+  dienThoai?: string;
+  email?: string;
+  diaChi?: string;
   suDung: boolean;
 }
 
 export default function UnitManagement() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,7 +25,7 @@ export default function UnitManagement() {
   const [formData, setFormData] = useState({
     maDonVi: "",
     tenDonVi: "",
-    donViCha: "",
+    donViChaId: undefined as number | undefined,
     dienThoai: "",
     email: "",
     diaChi: "",
@@ -29,69 +33,29 @@ export default function UnitManagement() {
   });
 
   useEffect(() => {
-    fetchUnits();
-  }, []);
-
-  const fetchUnits = async () => {
-    try {
-      // Replace with actual API
-      setTimeout(() => {
-        setUnits([
-          {
-            id: 1,
-            maDonVi: "VP",
-            tenDonVi: "Văn phòng Chủ tịch",
-            donViCha: null,
-            dienThoai: "0234567890",
-            email: "vpct@example.com",
-            diaChi: "123 Đường A, Hà Nội",
-            suDung: true,
-          },
-          {
-            id: 2,
-            maDonVi: "PHIT",
-            tenDonVi: "Phòng IT",
-            donViCha: "VP",
-            dienThoai: "0234567891",
-            email: "phit@example.com",
-            diaChi: "123 Đường A, Tầng 2, Hà Nội",
-            suDung: true,
-          },
-          {
-            id: 3,
-            maDonVi: "PHNS",
-            tenDonVi: "Phòng Nhân sự",
-            donViCha: "VP",
-            dienThoai: "0234567892",
-            email: "phns@example.com",
-            diaChi: "123 Đường A, Tầng 1, Hà Nội",
-            suDung: true,
-          },
-          {
-            id: 4,
-            maDonVi: "PHTC",
-            tenDonVi: "Phòng Tài chính",
-            donViCha: "VP",
-            dienThoai: "0234567893",
-            email: "phtc@example.com",
-            diaChi: "123 Đường A, Tầng 3, Hà Nội",
-            suDung: true,
-          },
-        ]);
+    const loadUnits = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetchUnits({ page: 0, size: 200, keyword: searchTerm || undefined });
+        setUnits(response.content || []);
+      } catch (err) {
+        const message = err instanceof ApiError ? err.message : "Không thể tải đơn vị";
+        setError(message);
+      } finally {
         setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Error fetching units:", error);
-      setLoading(false);
-    }
-  };
+      }
+    };
+
+    loadUnits();
+  }, []);
 
   const handleAddUnit = () => {
     setEditingUnit(null);
     setFormData({
       maDonVi: "",
       tenDonVi: "",
-      donViCha: "",
+      donViChaId: undefined,
       dienThoai: "",
       email: "",
       diaChi: "",
@@ -105,10 +69,10 @@ export default function UnitManagement() {
     setFormData({
       maDonVi: unit.maDonVi,
       tenDonVi: unit.tenDonVi,
-      donViCha: unit.donViCha || "",
-      dienThoai: unit.dienThoai,
-      email: unit.email,
-      diaChi: unit.diaChi,
+      donViChaId: unit.donViChaId || undefined,
+      dienThoai: unit.dienThoai || "",
+      email: unit.email || "",
+      diaChi: unit.diaChi || "",
       suDung: unit.suDung,
     });
     setShowForm(true);
@@ -121,10 +85,30 @@ export default function UnitManagement() {
         return;
       }
 
-      // Replace with actual API
-      console.log("Saving unit:", formData);
+      if (editingUnit) {
+        await updateUnit(editingUnit.id, {
+          maDonVi: formData.maDonVi,
+          tenDonVi: formData.tenDonVi,
+          donViChaId: formData.donViChaId || null,
+          dienThoai: formData.dienThoai,
+          email: formData.email,
+          diaChi: formData.diaChi,
+          suDung: formData.suDung,
+        });
+      } else {
+        await createUnit({
+          maDonVi: formData.maDonVi,
+          tenDonVi: formData.tenDonVi,
+          donViChaId: formData.donViChaId || null,
+          dienThoai: formData.dienThoai,
+          email: formData.email,
+          diaChi: formData.diaChi,
+        });
+      }
+
       setShowForm(false);
-      await fetchUnits();
+      const response = await fetchUnits({ page: 0, size: 200 });
+      setUnits(response.content || []);
     } catch (error) {
       console.error("Error saving unit:", error);
     }
@@ -133,24 +117,37 @@ export default function UnitManagement() {
   const handleDeleteUnit = async (id: number) => {
     if (confirm("Bạn chắc chắn muốn xóa đơn vị này?")) {
       try {
-        // Replace with actual API
-        console.log("Deleting unit:", id);
-        await fetchUnits();
+        await deleteUnit(id);
+        const response = await fetchUnits({ page: 0, size: 200 });
+        setUnits(response.content || []);
       } catch (error) {
         console.error("Error deleting unit:", error);
       }
     }
   };
 
-  const filteredUnits = units.filter(
-    (unit) =>
-      unit.tenDonVi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      unit.maDonVi.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUnits = useMemo(() => {
+    if (!searchTerm) return units;
+    return units.filter(
+      (unit) =>
+        unit.tenDonVi.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        unit.maDonVi.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [units, searchTerm]);
+
+  const unitNameById = useMemo(() => {
+    return new Map(units.map((unit) => [unit.id, unit.tenDonVi]));
+  }, [units]);
 
   if (loading) {
     return (
       <div className="admin-loading">Đang tải đơn vị...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-loading">{error}</div>
     );
   }
 
@@ -220,19 +217,23 @@ export default function UnitManagement() {
                 <div className="form-group">
                   <label>Đơn vị cha</label>
                   <select
-                    value={formData.donViCha}
+                    value={formData.donViChaId ?? ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, donViCha: e.target.value })
+                      setFormData({
+                        ...formData,
+                        donViChaId: e.target.value ? Number(e.target.value) : undefined,
+                      })
                     }
                     className="form-input"
                   >
                     <option value="">Không có</option>
-                    <option value="VP">Văn phòng Chủ tịch</option>
-                    {filteredUnits.map((unit) => (
-                      <option key={unit.id} value={unit.tenDonVi}>
-                        {unit.tenDonVi}
-                      </option>
-                    ))}
+                    {units
+                      .filter((unit) => !editingUnit || unit.id !== editingUnit.id)
+                      .map((unit) => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.tenDonVi}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div className="form-group">
@@ -328,7 +329,7 @@ export default function UnitManagement() {
                 <span className="code-badge">{unit.maDonVi}</span>
               </td>
               <td>{unit.tenDonVi}</td>
-              <td>{unit.donViCha || "-"}</td>
+              <td>{unit.tenDonViCha || (unit.donViChaId ? unitNameById.get(unit.donViChaId) : "-") || "-"}</td>
               <td>{unit.dienThoai}</td>
               <td>{unit.email}</td>
               <td>

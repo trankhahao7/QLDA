@@ -1,4 +1,15 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ApiError } from "../../services/core/apiClient";
+import { fetchPendingApprovals } from "../../services/workflows/approvalsApi";
+import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
+import { fetchDashboardStats } from "../../services/reports/reportsApi";
+import type { DashboardStats } from "../../services/reports/reportsApi";
+import { fetchDocumentStatistics } from "../../services/reports/reportsDocumentsApi";
+import type { DocumentStatisticsItem } from "../../services/reports/reportsDocumentsApi";
+import { fetchUnits } from "../../services/units/unitsApi";
+import { fetchUsers } from "../../services/auth/usersApi";
+import { fetchAuditLogs } from "../../services/auth/auditLogsApi";
+import type { AuditLogItem } from "../../services/auth/auditLogsApi";
 
 interface SystemStats {
   totalUsers: number;
@@ -9,6 +20,45 @@ interface SystemStats {
   pendingApprovals: number;
   units: number;
   documentTypes: number;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Chờ xử lý",
+  PROCESSING: "Đang xử lý",
+  COMPLETED: "Hoàn thành",
+  REJECTED: "Từ chối",
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  AZURE_LOGIN: "Đăng nhập Azure",
+  LOGOUT: "Đăng xuất",
+  CREATE_USER: "Tạo người dùng",
+  UPDATE_USER: "Cập nhật người dùng",
+  UPDATE_USER_STATUS: "Đổi trạng thái",
+  ASSIGN_ROLE: "Phân quyền",
+  DELETE_USER: "Xóa người dùng",
+  SYNC_AZURE_USERS: "Đồng bộ Azure",
+};
+
+function formatTime(dt: string): string {
+  const d = new Date(dt);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm} - Hôm nay`;
+}
+
+function statusBadge(trangThai: number | undefined): string {
+  if (trangThai == null) return "badge badge-success";
+  return trangThai === 1 ? "badge badge-success" : "badge badge-warning";
+}
+
+function statusText(trangThai: number | undefined): string {
+  if (trangThai == null) return "Thành công";
+  return trangThai === 1 ? "Thành công" : "Cảnh báo";
+}
+
+function actionLabel(hanhDong: string): string {
+  return ACTION_LABELS[hanhDong] || hanhDong;
 }
 
 export default function AdminDashboard() {
@@ -23,32 +73,59 @@ export default function AdminDashboard() {
     documentTypes: 0,
   });
 
+  const [recentActivities, setRecentActivities] = useState<AuditLogItem[]>([]);
+  const [statusStats, setStatusStats] = useState<Record<string, number>>({
+    PENDING: 0,
+    PROCESSING: 0,
+    COMPLETED: 0,
+    REJECTED: 0,
+  });
+
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate API call - replace with actual API
     const fetchStats = async () => {
       try {
-        // const response = await fetch('/api/admin/stats');
-        // const data = await response.json();
-        // setStats(data);
+        setLoading(true);
+        setError(null);
+        const [dashboard, usersAll, usersActive, units, documentTypes, approvals, auditLogs, docStats] = await Promise.all([
+          fetchDashboardStats(),
+          fetchUsers({ page: 0, size: 1 }),
+          fetchUsers({ page: 0, size: 1, trangThai: 1 }),
+          fetchUnits({ page: 0, size: 1 }),
+          fetchDocumentTypes({}),
+          fetchPendingApprovals({ page: 0, size: 1 }),
+          fetchAuditLogs({ page: 0, size: 5 }),
+          fetchDocumentStatistics({ groupBy: "status" }).catch(() => null),
+        ]);
 
-        // Mock data for demo
-        setTimeout(() => {
-          setStats({
-            totalUsers: 145,
-            activeUsers: 89,
-            totalDocuments: 3421,
-            processingDocuments: 23,
-            completedToday: 12,
-            pendingApprovals: 8,
-            units: 15,
-            documentTypes: 12,
+        const statusCounts: Record<string, number> = { PENDING: 0, PROCESSING: 0, COMPLETED: 0, REJECTED: 0 };
+        if (docStats?.items) {
+          docStats.items.forEach((item: DocumentStatisticsItem) => {
+            if (statusCounts[item.label] !== undefined) {
+              statusCounts[item.label] = item.value;
+            }
           });
-          setLoading(false);
-        }, 500);
+        }
+
+        setStats({
+          totalUsers: usersAll.totalElements || 0,
+          activeUsers: usersActive.totalElements || 0,
+          totalDocuments: dashboard.totalDocuments || 0,
+          processingDocuments: dashboard.processingDocuments || 0,
+          completedToday: dashboard.completedDocuments || 0,
+          pendingApprovals: approvals.totalElements || 0,
+          units: units.totalElements || 0,
+          documentTypes: documentTypes.length,
+        });
+        setRecentActivities(auditLogs.content.slice(0, 5));
+        setStatusStats(statusCounts);
+        setLoading(false);
       } catch (error) {
         console.error("Error fetching stats:", error);
+        const message = error instanceof ApiError ? error.message : "Không thể tải thống kê";
+        setError(message);
         setLoading(false);
       }
     };
@@ -58,6 +135,10 @@ export default function AdminDashboard() {
 
   if (loading) {
     return <div className="admin-loading">Đang tải dữ liệu...</div>;
+  }
+
+  if (error) {
+    return <div className="admin-loading">{error}</div>;
   }
 
   return (
@@ -112,30 +193,20 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>10:30 - Hôm nay</td>
-              <td>Nguyễn Văn A</td>
-              <td>Tạo văn bản mới</td>
-              <td><span className="badge badge-success">Thành công</span></td>
-            </tr>
-            <tr>
-              <td>09:15 - Hôm nay</td>
-              <td>Trần Thị B</td>
-              <td>Phê duyệt văn bản</td>
-              <td><span className="badge badge-success">Thành công</span></td>
-            </tr>
-            <tr>
-              <td>08:45 - Hôm nay</td>
-              <td>Lê Văn C</td>
-              <td>Đổi mật khẩu</td>
-              <td><span className="badge badge-success">Thành công</span></td>
-            </tr>
-            <tr>
-              <td>08:20 - Hôm nay</td>
-              <td>Phạm Văn D</td>
-              <td>Cập nhật hồ sơ</td>
-              <td><span className="badge badge-warning">Cảnh báo</span></td>
-            </tr>
+            {recentActivities.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", color: "#888" }}>Chưa có hoạt động nào</td>
+              </tr>
+            ) : (
+              recentActivities.map((a) => (
+                <tr key={a.id}>
+                  <td>{formatTime(a.thoiGianThucHien)}</td>
+                  <td>{a.hoTen || `#${a.nguoiDungId}`}</td>
+                  <td>{actionLabel(a.hanhDong)}</td>
+                  <td><span className={statusBadge(a.trangThai)}>{statusText(a.trangThai)}</span></td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -143,22 +214,12 @@ export default function AdminDashboard() {
       <div className="admin-section">
         <h2>Thống kê xử lý văn bản theo trạng thái</h2>
         <div className="status-stats">
-          <div className="status-item">
-            <span className="status-label">Chờ xử lý:</span>
-            <span className="status-count">45</span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">Đang xử lý:</span>
-            <span className="status-count">23</span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">Hoàn thành:</span>
-            <span className="status-count">3421</span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">Từ chối:</span>
-            <span className="status-count">12</span>
-          </div>
+          {Object.entries(statusStats).map(([key, value]) => (
+            <div key={key} className="status-item">
+              <span className="status-label">{STATUS_LABELS[key]}:</span>
+              <span className="status-count">{value}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
