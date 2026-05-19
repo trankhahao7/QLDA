@@ -17,7 +17,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "KetQuaAI")
+@Table(name = "ketquaai")
 @Getter
 @Setter
 @Builder
@@ -27,35 +27,35 @@ public class AiResultEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID")
+    @Column(name = "id")
     private Long id;
 
-    @Column(name = "VanBanID")
+    @Column(name = "vanbanid")
     private Long vanBanID;
 
-    @Column(name = "NguoiYeuCauID")
+    @Column(name = "nguoiyeucauid")
     private Long nguoiYeuCauID;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "LoaiXuLyAI")
+    @Column(name = "loaixulyai")
     private AiProcessType loaiXuLyAI;
 
-    @Column(name = "NoiDungDauVao")
+    @Column(name = "noidungdauvao")
     private String noiDungDauVao;
 
-    @Column(name = "KetQuaTraVe")
+    @Column(name = "ketquatrave")
     private String ketQuaTraVe;
 
-    @Column(name = "DoTinCay")
+    @Column(name = "dotincay")
     private Double doTinCay;
 
-    @Column(name = "ModelSuDung")
+    @Column(name = "modelsudung")
     private String modelSuDung;
 
-    @Column(name = "ThoiGianXuLy")
+    @Column(name = "thoigianxuly")
     private LocalDateTime thoiGianXuLy;
 
-    @Column(name = "GhiChu")
+    @Column(name = "ghichu")
     private String ghiChu;
 }
 

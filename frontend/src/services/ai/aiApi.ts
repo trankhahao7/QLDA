@@ -1,16 +1,29 @@
 import { apiGet, apiPost, apiDelete } from "../core/apiClient";
 
+export type ChatbotSource = {
+  documentId: number;
+  chunkId: number;
+  score: number;
+  matchedText: string;
+  title?: string;
+  reference?: string;
+};
+
 export type ChatbotResponse = {
-  conversationId: string;
+  resultId: number;
+  intent: string;
+  metricCode?: string;
   question: string;
   answer: string;
-  sources?: Array<{ title: string; reference: string }>;
+  value?: number;
+  sources?: ChatbotSource[];
+  modelUsed: string;
+  confidence: number;
 };
 
 export const askChatbot = (payload: {
   userId: number;
   question: string;
-  conversationId: string;
   context?: {
     module?: string;
     documentId?: number | null;

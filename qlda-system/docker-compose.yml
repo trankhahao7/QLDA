@@ -175,7 +175,7 @@ services:
       AUTH_SERVICE_BASE_URL: http://auth-service:8081
       SERVICE_NAME: ai-service
       INTERNAL_SERVICE_TOKEN: change-me-in-dev
-      GEMINI_API_KEY:
+      GEMINI_API_KEY: AIzaSyAPSZZxFXYRV9Jm02Fnin3Zpkos9f_iMmQ
     networks:
       - qlda-net
 
