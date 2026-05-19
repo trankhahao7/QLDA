@@ -19,6 +19,8 @@ public interface VanBanRepository extends JpaRepository<VanBan, Long>, JpaSpecif
 
     List<VanBan> findByIdInAndDaXoaFalseAndNguoiTaoId(List<Long> ids, Long nguoiTaoId);
 
+    List<VanBan> findByIdInAndDaXoaFalse(List<Long> ids);
+
     long countByDaXoaFalse();
 
     long countByDaXoaFalseAndNguoiTaoId(Long nguoiTaoId);

@@ -72,4 +72,28 @@ public class ChatbotPromptBuilder {
             Nếu không có dữ liệu hướng dẫn, trả lời "Không tìm thấy hướng dẫn phù hợp."
             """.formatted(question, guideContext);
     }
+
+    public String generalHelpSystemPrompt() {
+        return """
+            Bạn là trợ lý AI của hệ thống Quản Lý Văn Bản (QLDA).
+            Hệ thống QLDA hỗ trợ: quản lý văn bản đến/văn bản đi, quy trình phê duyệt, trình ký,
+            ban hành văn bản, tìm kiếm tra cứu, báo cáo thống kê, quản lý người dùng và đơn vị,
+            tích hợp Office 365, thông báo nhắc việc, audit log.
+
+            Trả lời bằng tiếng Việt, rõ ràng, ngắn gọn, dễ hiểu.
+            Nếu người dùng hỏi về thao tác cụ thể trong hệ thống, hãy hướng dẫn từng bước.
+            Nếu người dùng hỏi về khái niệm, hãy giải thích dựa trên kiến thức hệ thống quản lý văn bản.
+            Không tự bịa thông tin. Không hiển thị thông tin kỹ thuật nội bộ cho người dùng cuối.
+            """;
+    }
+
+    public String buildGeneralHelpPrompt(String question) {
+        return """
+            Người dùng hỏi: %s
+
+            Hãy trả lời câu hỏi của người dùng dựa trên kiến thức về hệ thống quản lý văn bản.
+            Nếu câu hỏi không liên quan đến hệ thống, hãy trả lời lịch sự rằng bạn chỉ hỗ trợ các vấn đề
+            về hệ thống quản lý văn bản và đề nghị người dùng đặt câu hỏi khác.
+            """.formatted(question);
+    }
 }

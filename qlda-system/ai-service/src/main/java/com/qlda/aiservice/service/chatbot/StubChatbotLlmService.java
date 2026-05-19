@@ -5,7 +5,6 @@ import com.qlda.aiservice.service.ChatbotOutput;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-@Service
 @RequiredArgsConstructor
 public class StubChatbotLlmService implements ChatbotLlmService {
 

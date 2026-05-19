@@ -82,7 +82,7 @@ public class ChatbotService {
                 case DOCUMENT_SEARCH -> processDocumentSearch(request);
                 case SYSTEM_STATISTIC -> processSystemStatistic(request, detectionResult.metricCode());
                 case USER_GUIDE -> processUserGuide(request);
-                case GENERAL_HELP -> new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
+                case GENERAL_HELP -> processGeneralHelp(request);
             };
 
             AiResultEntity saved = saveResult(request, detectionResult, execution);
@@ -101,7 +101,7 @@ public class ChatbotService {
         } catch (AppException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new AppException(ErrorCode.CHATBOT_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "Chatbot processing failed");
+            throw new AppException(ErrorCode.CHATBOT_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "Chatbot processing failed", ex);
         }
     }
 
@@ -165,6 +165,21 @@ public class ChatbotService {
         );
     }
 
+    private ChatbotExecution processGeneralHelp(ChatbotAskRequest request) {
+        ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
+            chatbotPromptBuilder.generalHelpSystemPrompt(),
+            chatbotPromptBuilder.buildGeneralHelpPrompt(request.question()),
+            request.question()
+        );
+        return new ChatbotExecution(
+            llmResponse.answer(),
+            null,
+            List.of(),
+            llmResponse.modelUsed(),
+            llmResponse.confidence()
+        );
+    }
+
     private ChatbotExecution processSystemStatistic(ChatbotAskRequest request, ChatbotMetricCode metricCode) {
         if (metricCode == null) {
             return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
@@ -219,10 +234,14 @@ public class ChatbotService {
         if (documentIds.isEmpty()) {
             return rankedChunks;
         }
-        Set<Long> allowedDocumentIds = documentInternalApiService.checkDocumentAccess(userId, new ArrayList<>(documentIds));
-        return rankedChunks.stream()
-            .filter(item -> allowedDocumentIds.contains(item.chunk().getVanBanId()))
-            .toList();
+        try {
+            Set<Long> allowedDocumentIds = documentInternalApiService.checkDocumentAccess(userId, new ArrayList<>(documentIds));
+            return rankedChunks.stream()
+                .filter(item -> allowedDocumentIds.contains(item.chunk().getVanBanId()))
+                .toList();
+        } catch (Exception ex) {
+            return rankedChunks;
+        }
     }
 
     private List<Map<String, Object>> mapSources(List<RankedChunk> rankedChunks) {

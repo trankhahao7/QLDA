@@ -138,7 +138,7 @@ public class InternalDocumentServiceImpl implements InternalDocumentService {
         }
 
         Set<Long> existingAccessibleIds = new HashSet<>(
-            vanBanRepository.findByIdInAndDaXoaFalseAndNguoiTaoId(requestedDocumentIds, request.userId()).stream()
+            vanBanRepository.findByIdInAndDaXoaFalse(requestedDocumentIds).stream()
                 .map(VanBan::getId)
                 .toList()
         );
