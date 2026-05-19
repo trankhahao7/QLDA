@@ -1,6 +1,7 @@
 package com.qlda.documentservice.client;
 
 import com.qlda.documentservice.client.dto.WorkflowClientDtos;
+import com.qlda.documentservice.common.ApiResponse;
 import java.util.List;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,26 +13,26 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface WorkflowServiceClient {
 
     @PostMapping("/internal/workflows/documents/{documentId}/start")
-    WorkflowClientDtos.StartWorkflowResponse startWorkflow(
+    ApiResponse<WorkflowClientDtos.StartWorkflowResponse> startWorkflow(
         @PathVariable("documentId") Long documentId,
         @RequestBody WorkflowClientDtos.StartWorkflowRequest request
     );
 
     @PostMapping("/internal/workflows/documents/{documentId}/transfer")
-    WorkflowClientDtos.TransferWorkflowResponse transferWorkflow(
+    ApiResponse<WorkflowClientDtos.TransferWorkflowResponse> transferWorkflow(
         @PathVariable("documentId") Long documentId,
         @RequestBody WorkflowClientDtos.TransferWorkflowRequest request
     );
 
     @PostMapping("/internal/workflows/documents/{documentId}/submit-approval")
-    WorkflowClientDtos.SubmitApprovalResponse submitApproval(
+    ApiResponse<WorkflowClientDtos.SubmitApprovalResponse> submitApproval(
         @PathVariable("documentId") Long documentId,
         @RequestBody WorkflowClientDtos.SubmitApprovalRequest request
     );
 
     @GetMapping("/internal/workflows/documents/{documentId}/status")
-    WorkflowClientDtos.WorkflowStatusResponse getWorkflowStatus(@PathVariable("documentId") Long documentId);
+    ApiResponse<WorkflowClientDtos.WorkflowStatusResponse> getWorkflowStatus(@PathVariable("documentId") Long documentId);
 
     @GetMapping("/internal/workflows/documents/{documentId}/timeline")
-    List<WorkflowClientDtos.WorkflowTimelineItem> getWorkflowTimeline(@PathVariable("documentId") Long documentId);
+    ApiResponse<List<WorkflowClientDtos.WorkflowTimelineItem>> getWorkflowTimeline(@PathVariable("documentId") Long documentId);
 }

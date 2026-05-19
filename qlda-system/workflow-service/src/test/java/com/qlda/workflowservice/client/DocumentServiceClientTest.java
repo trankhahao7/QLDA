@@ -6,6 +6,7 @@ import com.qlda.workflowservice.client.dto.DocumentStatusUpdateRequest;
 import com.qlda.workflowservice.client.dto.DocumentWorkflowStatusUpdateRequest;
 import com.qlda.workflowservice.client.impl.DocumentServiceClientImpl;
 import com.qlda.workflowservice.client.internal.DocumentServiceHttpClient;
+import com.qlda.workflowservice.common.ApiResponse;
 import com.qlda.workflowservice.exception.ApiException;
 import com.qlda.workflowservice.exception.ErrorCode;
 import feign.FeignException;
@@ -37,7 +38,7 @@ class DocumentServiceClientTest {
     @Test
     void getDocumentById_success() {
         when(documentServiceHttpClient.getDocumentById(1L))
-                .thenReturn(new DocumentDetailDto(1L, "123", "test", 1, "Cong van", "INCOMING", 1, 2L, LocalDateTime.now(), 1, false, false));
+                .thenReturn(ApiResponse.ok("success", new DocumentDetailDto(1L, "123", "test", 1, "Cong van", "INCOMING", 1, 2L, LocalDateTime.now(), 1, false, false)));
 
         DocumentDetailDto response = documentServiceClient.getDocumentById(1L);
 

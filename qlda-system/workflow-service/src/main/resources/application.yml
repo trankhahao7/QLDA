@@ -56,6 +56,11 @@ services:
   auth-service:
     base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 
+feign:
+  httpclient:
+    hc5:
+      enabled: true
+
 internal:
   auth:
     service-name: ${INTERNAL_SERVICE_NAME:workflow-service}

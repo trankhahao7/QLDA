@@ -6,8 +6,11 @@ import com.qlda.workflowservice.client.dto.AuthPermissionCheckResponse;
 import com.qlda.workflowservice.client.dto.AuthUnitDto;
 import com.qlda.workflowservice.client.dto.AuthUserDto;
 import com.qlda.workflowservice.client.dto.AuthUserRolesDto;
+import com.qlda.workflowservice.client.dto.ValidateUnitsInternalRequest;
+import com.qlda.workflowservice.client.dto.ValidateUsersInternalRequest;
 import com.qlda.workflowservice.client.dto.ValidationResponse;
 import com.qlda.workflowservice.client.internal.AuthServiceHttpClient;
+import com.qlda.workflowservice.common.ApiResponse;
 import com.qlda.workflowservice.exception.ApiException;
 import com.qlda.workflowservice.exception.ErrorCode;
 import feign.FeignException;
@@ -25,12 +28,14 @@ public class AuthServiceClientImpl implements AuthServiceClient {
 
     @Override
     public AuthUserDto getUserById(Long id) {
-        return execute(() -> authServiceHttpClient.getUserById(id));
+        ApiResponse<AuthUserDto> apiResponse = execute(() -> authServiceHttpClient.getUserById(id));
+        return apiResponse != null ? apiResponse.data() : null;
     }
 
     @Override
     public void validateUsers(List<Long> userIds) {
-        ValidationResponse result = execute(() -> authServiceHttpClient.validateUsers(userIds));
+        ApiResponse<ValidationResponse> apiResponse = execute(() -> authServiceHttpClient.validateUsers(new ValidateUsersInternalRequest(userIds)));
+        ValidationResponse result = apiResponse != null ? apiResponse.data() : null;
         if (result == null || !result.valid()) {
             throw new ApiException(ErrorCode.USER_NOT_FOUND, HttpStatus.BAD_REQUEST, "Invalid users");
         }
@@ -38,12 +43,14 @@ public class AuthServiceClientImpl implements AuthServiceClient {
 
     @Override
     public AuthUnitDto getUnitById(Integer id) {
-        return execute(() -> authServiceHttpClient.getUnitById(id));
+        ApiResponse<AuthUnitDto> apiResponse = execute(() -> authServiceHttpClient.getUnitById(id));
+        return apiResponse != null ? apiResponse.data() : null;
     }
 
     @Override
     public void validateUnits(List<Integer> unitIds) {
-        ValidationResponse result = execute(() -> authServiceHttpClient.validateUnits(unitIds));
+        ApiResponse<ValidationResponse> apiResponse = execute(() -> authServiceHttpClient.validateUnits(new ValidateUnitsInternalRequest(unitIds)));
+        ValidationResponse result = apiResponse != null ? apiResponse.data() : null;
         if (result == null || !result.valid()) {
             throw new ApiException(ErrorCode.INVALID_REQUEST, HttpStatus.BAD_REQUEST, "Invalid units");
         }
@@ -51,12 +58,14 @@ public class AuthServiceClientImpl implements AuthServiceClient {
 
     @Override
     public AuthUserRolesDto getUserRoles(Long id) {
-        return execute(() -> authServiceHttpClient.getUserRoles(id));
+        ApiResponse<AuthUserRolesDto> apiResponse = execute(() -> authServiceHttpClient.getUserRoles(id));
+        return apiResponse != null ? apiResponse.data() : null;
     }
 
     @Override
     public AuthPermissionCheckResponse checkPermission(Long userId, String maChucNang, String permission) {
-        return execute(() -> authServiceHttpClient.checkPermission(new AuthPermissionCheckRequest(userId, maChucNang, permission)));
+        ApiResponse<AuthPermissionCheckResponse> apiResponse = execute(() -> authServiceHttpClient.checkPermission(new AuthPermissionCheckRequest(userId, maChucNang, permission)));
+        return apiResponse != null ? apiResponse.data() : null;
     }
 
     private <T> T execute(Supplier<T> supplier) {

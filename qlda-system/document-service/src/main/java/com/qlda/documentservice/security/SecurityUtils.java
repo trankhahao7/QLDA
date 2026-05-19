@@ -13,6 +13,9 @@ public class SecurityUtils {
         return getJwt().map(jwt -> {
             Object value = jwt.getClaims().get("userId");
             if (value == null) {
+                value = jwt.getClaims().get("uid");
+            }
+            if (value == null) {
                 return null;
             }
             return Long.valueOf(value.toString());

@@ -4,13 +4,23 @@ import { searchIncomingDocuments } from "../../services/documents/documentSearch
 import type { DocumentListItem } from "../../services/documents/documentsApi";
 import { Link } from "react-router-dom";
 
+const TRANG_THAI_MAP: Record<number, { label: string; className: string }> = {
+  0: { label: "Nháp", className: "badge badge--ghost" },
+  1: { label: "Đang xử lý", className: "badge badge--info" },
+  2: { label: "Đã chuyển xử lý", className: "badge badge--warning" },
+  3: { label: "Trình ký", className: "badge badge--primary" },
+  4: { label: "Đã ký", className: "badge badge--success" },
+  5: { label: "Đã phát hành", className: "badge badge--success" },
+};
+
 interface VanBanTimKiem {
   id: number;
   soKyHieu: string;
   trichYeu: string;
+  tenLoaiVanBan?: string;
   donViBanHanh: string;
   ngayTiepNhan: string;
-  trangThai: string;
+  trangThai: number;
 }
 
 export default function Search() {
@@ -37,21 +47,15 @@ export default function Search() {
         trangThai: status ? Number(status) : undefined,
       });
 
-        const statusLabels: Record<number, string> = {
-          1: "Đang xử lý",
-          2: "Hoàn thành",
-        };
         setResults(
           (response.content || []).map((item: DocumentListItem) => ({
             id: item.id,
             soKyHieu: item.soKyHieu || "-",
             trichYeu: item.trichYeu,
+            tenLoaiVanBan: item.tenLoaiVanBan,
             donViBanHanh: item.donViBanHanh || "-",
             ngayTiepNhan: item.ngayTiepNhan || "",
-            trangThai:
-              item.trangThai !== undefined
-                ? statusLabels[item.trangThai] || "-"
-                : "-",
+            trangThai: item.trangThai ?? -1,
           }))
         );
     } catch (err) {
@@ -122,28 +126,37 @@ export default function Search() {
         ) : results.length === 0 ? (
           <p style={{ textAlign: "center" }}>Không tìm thấy kết quả</p>
         ) : (
-          <table className="table">
+          <table className="table" style={{ width: "100%" }}>
             <thead>
               <tr>
-                <th>Mã</th>
+                <th style={{ whiteSpace: "nowrap" }}>Mã</th>
+                <th style={{ whiteSpace: "nowrap" }}>Loại</th>
                 <th>Nội dung</th>
-                <th>Đơn vị</th>
-                <th>Trạng thái</th>
+                <th style={{ whiteSpace: "nowrap" }}>Đơn vị</th>
+                <th style={{ whiteSpace: "nowrap" }}>Ngày</th>
+                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              {results.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.soKyHieu}</td>
-                  <td>
-                    <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
-                  </td>
-                  <td>{item.donViBanHanh}</td>
-                  <td>
-                    <span className="badge">{item.trangThai}</span>
-                  </td>
-                </tr>
-              ))}
+              {results.map((item) => {
+                const stt = TRANG_THAI_MAP[item.trangThai] ?? { label: "Không xác định", className: "badge badge--ghost" };
+                return (
+                  <tr key={item.id}>
+                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
+                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
+                    <td>
+                      <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
+                    </td>
+                    <td style={{ fontSize: 13 }}>{item.donViBanHanh}</td>
+                    <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
+                      {item.ngayTiepNhan ? new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
+                    </td>
+                    <td>
+                      <span className={stt.className}>{stt.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

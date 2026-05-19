@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.qlda.documentservice.client.AiServiceClient;
 import com.qlda.documentservice.client.AuthServiceClient;
 import com.qlda.documentservice.client.WorkflowServiceClient;
+import com.qlda.documentservice.common.ApiResponse;
 import com.qlda.documentservice.client.dto.AiClientDtos;
 import com.qlda.documentservice.client.dto.AuthClientDtos;
 import com.qlda.documentservice.client.dto.WorkflowClientDtos;
@@ -72,7 +73,7 @@ class DocumentWorkflowServiceImplTest {
         LoaiVanBan type = createLoaiVanBan(1);
         when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
-        when(authServiceClient.getUnitById(5)).thenReturn(new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
             if (entity.getId() == null) {
@@ -81,7 +82,7 @@ class DocumentWorkflowServiceImplTest {
             return entity;
         });
         when(workflowServiceClient.startWorkflow(eq(100L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.StartWorkflowResponse(100L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(100L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
         when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
             .thenReturn(new DocumentResponses.DocumentSimpleResponse(100L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
 
@@ -108,7 +109,7 @@ class DocumentWorkflowServiceImplTest {
         LoaiVanBan type = createLoaiVanBan(1);
         when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
-        when(authServiceClient.getUnitById(5)).thenReturn(new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
             if (entity.getId() == null) {
@@ -117,7 +118,7 @@ class DocumentWorkflowServiceImplTest {
             return entity;
         });
         when(workflowServiceClient.startWorkflow(eq(101L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.StartWorkflowResponse(101L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(101L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
         doThrow(new RuntimeException("kafka down")).when(notificationEventPublisher).publish(any());
         when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
             .thenReturn(new DocumentResponses.DocumentSimpleResponse(101L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
@@ -133,7 +134,7 @@ class DocumentWorkflowServiceImplTest {
         LoaiVanBan type = createLoaiVanBan(3);
         when(loaiVanBanRepository.findById(3)).thenReturn(Optional.of(type));
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(15L));
-        when(authServiceClient.getUnitById(8)).thenReturn(new AuthClientDtos.UnitInfoResponse(8, "DV8", "Don vi 8", null, true));
+        when(authServiceClient.getUnitById(8)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(8, "DV8", "Don vi 8", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
             if (entity.getId() == null) {
@@ -142,7 +143,7 @@ class DocumentWorkflowServiceImplTest {
             return entity;
         });
         when(workflowServiceClient.startWorkflow(eq(102L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.StartWorkflowResponse(102L, 12L, 23L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(102L, 12L, 23L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
         when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
             .thenReturn(new DocumentResponses.DocumentSimpleResponse(102L, "02/OUT/2026", "Out", 3, 1, null, null));
 
@@ -159,10 +160,10 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(200L);
         when(vanBanRepository.findByIdAndDaXoaFalse(200L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authServiceClient.getUserById(88L)).thenReturn(new AuthClientDtos.UserInfoResponse(88L, "u88", "User 88", null, null, null, null, null, 1));
-        when(authServiceClient.getUnitById(9)).thenReturn(new AuthClientDtos.UnitInfoResponse(9, "DV9", "Don vi 9", null, true));
+        when(authServiceClient.getUserById(88L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(88L, "u88", "User 88", null, null, null, null, null, 1)));
+        when(authServiceClient.getUnitById(9)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(9, "DV9", "Don vi 9", null, true)));
         when(workflowServiceClient.transferWorkflow(eq(200L), any(WorkflowClientDtos.TransferWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.TransferWorkflowResponse(300L, 200L, 88L, 1));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.TransferWorkflowResponse(300L, 200L, 88L, 1)));
 
         DocumentResponses.TransferResponse response = service.transferIncoming(
             200L,
@@ -181,10 +182,10 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(201L);
         when(vanBanRepository.findByIdAndDaXoaFalse(201L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authServiceClient.getUserById(90L)).thenReturn(new AuthClientDtos.UserInfoResponse(90L, "u90", "User 90", null, null, null, null, null, 1));
-        when(authServiceClient.getUnitById(10)).thenReturn(new AuthClientDtos.UnitInfoResponse(10, "DV10", "Don vi 10", null, true));
+        when(authServiceClient.getUserById(90L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(90L, "u90", "User 90", null, null, null, null, null, 1)));
+        when(authServiceClient.getUnitById(10)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(10, "DV10", "Don vi 10", null, true)));
         when(workflowServiceClient.transferWorkflow(eq(201L), any(WorkflowClientDtos.TransferWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.TransferWorkflowResponse(301L, 201L, 90L, 1));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.TransferWorkflowResponse(301L, 201L, 90L, 1)));
         doThrow(new RuntimeException("kafka down")).when(notificationEventPublisher).publish(any());
 
         DocumentResponses.TransferResponse response = service.transferIncoming(
@@ -201,9 +202,9 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(300L);
         when(vanBanRepository.findByIdAndDaXoaFalse(300L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authServiceClient.getUserById(66L)).thenReturn(new AuthClientDtos.UserInfoResponse(66L, "u66", "User 66", null, null, null, null, null, 1));
+        when(authServiceClient.getUserById(66L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(66L, "u66", "User 66", null, null, null, null, null, 1)));
         when(workflowServiceClient.submitApproval(eq(300L), any(WorkflowClientDtos.SubmitApprovalRequest.class)))
-            .thenReturn(new WorkflowClientDtos.SubmitApprovalResponse(300L, 400L, 66L, 1));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.SubmitApprovalResponse(300L, 400L, 66L, 1)));
 
         DocumentResponses.SubmitSigningResponse response = service.submitDraftSigning(
             300L,
@@ -221,9 +222,9 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(301L);
         when(vanBanRepository.findByIdAndDaXoaFalse(301L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(authServiceClient.getUserById(77L)).thenReturn(new AuthClientDtos.UserInfoResponse(77L, "u77", "User 77", null, null, null, null, null, 1));
+        when(authServiceClient.getUserById(77L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(77L, "u77", "User 77", null, null, null, null, null, 1)));
         when(workflowServiceClient.submitApproval(eq(301L), any(WorkflowClientDtos.SubmitApprovalRequest.class)))
-            .thenReturn(new WorkflowClientDtos.SubmitApprovalResponse(301L, 401L, 77L, 1));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.SubmitApprovalResponse(301L, 401L, 77L, 1)));
 
         DocumentResponses.SubmitApprovalResponse response = service.submitOutgoingApproval(
             301L,
@@ -362,9 +363,9 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(600L);
         when(vanBanRepository.findByIdAndDaXoaFalse(600L)).thenReturn(Optional.of(vanBan));
         when(authServiceClient.validateUsers(new AuthClientDtos.ValidateUsersRequest(List.of(1L, 2L))))
-            .thenReturn(new AuthClientDtos.ValidateUsersResponse(true, List.of()));
+            .thenReturn(ApiResponse.success("ok", new AuthClientDtos.ValidateUsersResponse(true, List.of())));
         when(authServiceClient.validateUnits(new AuthClientDtos.ValidateUnitsRequest(List.of(3, 4))))
-            .thenReturn(new AuthClientDtos.ValidateUnitsResponse(true, List.of()));
+            .thenReturn(ApiResponse.success("ok", new AuthClientDtos.ValidateUnitsResponse(true, List.of())));
 
         DocumentResponses.SendDocumentResponse response = service.send(
             600L,
@@ -381,7 +382,7 @@ class DocumentWorkflowServiceImplTest {
     void createIncomingDocument_shouldNotPublishWhenWorkflowFails() {
         LoaiVanBan type = createLoaiVanBan(1);
         when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
-        when(authServiceClient.getUnitById(5)).thenReturn(new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
             if (entity.getId() == null) {
@@ -411,7 +412,7 @@ class DocumentWorkflowServiceImplTest {
         LoaiVanBan type = createLoaiVanBan(1);
         when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
         when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
-        when(authServiceClient.getUnitById(5)).thenReturn(new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
             if (entity.getId() == null) {
@@ -420,7 +421,7 @@ class DocumentWorkflowServiceImplTest {
             return entity;
         });
         when(workflowServiceClient.startWorkflow(eq(100L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
-            .thenReturn(new WorkflowClientDtos.StartWorkflowResponse(100L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY));
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(100L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
         when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
             .thenReturn(new DocumentResponses.DocumentSimpleResponse(100L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
 

@@ -35,6 +35,8 @@ public class DocumentMapper {
             vanBan.getNgayVanBan(),
             vanBan.getNgayTiepNhan(),
             vanBan.getHanXuLy(),
+            vanBan.getDoKhan(),
+            vanBan.getDoMat(),
             vanBan.getTrangThai()
         );
     }

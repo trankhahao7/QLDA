@@ -4,6 +4,12 @@ import com.qlda.documentservice.common.ApiResponse;
 import com.qlda.documentservice.dto.response.DocumentResponses;
 import com.qlda.documentservice.service.AttachmentService;
 import java.util.List;
+import java.util.Set;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/documents")
 @PreAuthorize("hasAnyRole('ADMIN','CHUYEN_VIEN','LANH_DAO')")
 public class AttachmentController {
+    private static final Set<String> OFFICE_EXTENSIONS = Set.of(".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx");
+
     private final AttachmentService attachmentService;
 
     public AttachmentController(AttachmentService attachmentService) {
@@ -40,6 +48,25 @@ public class AttachmentController {
     @GetMapping("/attachments/{attachmentId}/download")
     public ApiResponse<DocumentResponses.AttachmentDownloadResponse> download(@PathVariable Long attachmentId) {
         return ApiResponse.success("Get attachment download link successfully", attachmentService.download(attachmentId));
+    }
+
+    @GetMapping("/attachments/{attachmentId}/file")
+    public ResponseEntity<Resource> getFile(@PathVariable Long attachmentId) {
+        DocumentResponses.AttachmentDownloadResponse info = attachmentService.download(attachmentId);
+        Resource resource = attachmentService.getFile(attachmentId);
+        String filename = info.downloadUrl().contains("/")
+            ? info.downloadUrl().substring(info.downloadUrl().lastIndexOf("/") + 1)
+            : info.downloadUrl();
+        MediaType mediaType = MediaTypeFactory.getMediaType(filename)
+            .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        boolean isOffice = OFFICE_EXTENSIONS.stream().anyMatch(filename::endsWith);
+        String contentDisposition = isOffice
+            ? "attachment; filename=\"" + filename + "\""
+            : "inline; filename=\"" + filename + "\"";
+        return ResponseEntity.ok()
+            .contentType(mediaType)
+            .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+            .body(resource);
     }
 
     @DeleteMapping("/attachments/{attachmentId}")

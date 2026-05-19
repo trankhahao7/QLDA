@@ -3,7 +3,7 @@ import { apiPost } from "../core/apiClient";
 export const transferDocument = (documentId: number, payload: {
   nguoiGuiId: number;
   nguoiNhanId: number;
-  donViXuLyId: number;
+  donViXuLyId?: number;
   buocQuyTrinhId?: number;
   hanhDongXuLy?: string;
   yKienXuLy?: string;
