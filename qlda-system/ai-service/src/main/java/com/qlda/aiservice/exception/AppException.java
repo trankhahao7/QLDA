@@ -13,6 +13,12 @@ public class AppException extends RuntimeException {
         this.status = status;
     }
 
+    public AppException(ErrorCode errorCode, HttpStatus status, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+        this.status = status;
+    }
+
     public ErrorCode getErrorCode() {
         return errorCode;
     }

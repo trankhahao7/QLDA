@@ -36,6 +36,11 @@ public class ChatbotIntentDetector {
             || normalized.contains("tai lieu lien quan")) {
             return new IntentDetectionResult(ChatbotIntent.DOCUMENT_SEARCH, null);
         }
+        if (normalized.contains("huong dan")
+            || normalized.contains("lam sao")
+            || normalized.contains("cach")) {
+            return new IntentDetectionResult(ChatbotIntent.USER_GUIDE, null);
+        }
         return new IntentDetectionResult(ChatbotIntent.GENERAL_HELP, null);
     }
 
