@@ -31,6 +31,8 @@ public final class DocumentResponses {
         LocalDateTime ngayVanBan,
         LocalDateTime ngayTiepNhan,
         LocalDateTime hanXuLy,
+        String doKhan,
+        String doMat,
         Integer trangThai
     ) {
     }

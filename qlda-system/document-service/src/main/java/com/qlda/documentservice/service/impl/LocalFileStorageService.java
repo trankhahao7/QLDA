@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -40,6 +43,19 @@ public class LocalFileStorageService implements FileStorageService {
         } catch (IOException ex) {
             throw new BusinessException(ErrorCode.FILE_UPLOAD_FAILED, "Upload file failed", org.springframework.http.HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @Override
+    public Resource load(String path) {
+        String filename = path.replace("\\", "/");
+        if (filename.startsWith("/uploads/")) {
+            filename = filename.substring("/uploads/".length());
+        }
+        Path filePath = uploadPath.resolve(filename).normalize();
+        if (!Files.exists(filePath)) {
+            throw new BusinessException(ErrorCode.ATTACHMENT_NOT_FOUND, "File not found: " + path, HttpStatus.NOT_FOUND);
+        }
+        return new FileSystemResource(filePath);
     }
 
     @Override

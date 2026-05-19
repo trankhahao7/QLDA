@@ -19,7 +19,7 @@ public final class WorkflowClientDtos {
     ) {
     }
 
-    public record TransferWorkflowRequest(Long nguoiNhanId, Integer donViXuLyId, String noiDungChuyen) {
+    public record TransferWorkflowRequest(Long nguoiGuiId, Long nguoiNhanId, Integer donViXuLyId, String yKienXuLy, LocalDateTime hanXuLy) {
     }
 
     public record TransferWorkflowResponse(Long processingId, Long documentId, Long nguoiNhanId, Integer trangThaiXuLy) {

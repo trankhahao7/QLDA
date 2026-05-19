@@ -1,48 +1,200 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../../services/core/apiClient";
 import { fetchIncomingDocuments, type DocumentListItem } from "../../services/documents/documentsApi";
+import { transferDocument } from "../../services/workflows/workflowsTransferApi";
+import { getCurrentUser } from "../../services/auth/authApi";
+import { fetchUsers, type UserItem } from "../../services/auth/usersApi";
+import { fetchUnits, type UnitItem } from "../../services/units/unitsApi";
+
+const TRANG_THAI_MAP: Record<number, { label: string; className: string }> = {
+  0: { label: "Nháp", className: "badge badge--ghost" },
+  1: { label: "Đang xử lý", className: "badge badge--info" },
+  2: { label: "Đã chuyển xử lý", className: "badge badge--warning" },
+  3: { label: "Trình ký", className: "badge badge--primary" },
+  4: { label: "Đã ký", className: "badge badge--success" },
+  5: { label: "Đã phát hành", className: "badge badge--success" },
+};
+
+const DO_KHAN_LABEL: Record<string, { label: string; className: string }> = {
+  BINH_THUONG: { label: "Bình thường", className: "badge badge--ghost" },
+  KHAN: { label: "Khẩn", className: "badge badge--danger" },
+  THUONG_KHAN: { label: "Thượng khẩn", className: "badge badge--danger" },
+  HOA_TOC: { label: "Hỏa tốc", className: "badge badge--danger" },
+};
+
+function getTrangThaiBadge(trangThai?: number) {
+  const stt = trangThai ?? -1;
+  return TRANG_THAI_MAP[stt] ?? { label: "Không xác định", className: "badge badge--ghost" };
+}
+
+function getDoKhanBadge(doKhan?: string) {
+  if (!doKhan) return null;
+  return DO_KHAN_LABEL[doKhan] ?? { label: doKhan, className: "badge badge--ghost" };
+}
 
 interface VanBanDen {
   id: number;
   soKyHieu: string;
   trichYeu: string;
+  tenLoaiVanBan?: string;
   donViBanHanh: string;
   ngayTiepNhan: string;
-  doKhan: string;
+  doKhan?: string;
+  trangThai?: number;
+  hanXuLy?: string;
 }
 
 export default function Inbox() {
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState<VanBanDen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [units, setUnits] = useState<UnitItem[]>([]);
+
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferDoc, setTransferDoc] = useState<VanBanDen | null>(null);
+  const [transferForm, setTransferForm] = useState({ nguoiNhanId: "", donViXuLyId: "", noiDungChuyen: "", hanXuLy: "" });
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferResult, setTransferResult] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadInbox = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetchIncomingDocuments({ page: 0, size: 20 });
+    fetchIncomingDocuments({ page: 0, size: 50 })
+      .then((response) => {
         setDocuments(
           (response.content || []).map((doc: DocumentListItem) => ({
             id: doc.id,
             soKyHieu: doc.soKyHieu || "-",
             trichYeu: doc.trichYeu,
+            tenLoaiVanBan: doc.tenLoaiVanBan,
             donViBanHanh: doc.donViBanHanh || "-",
             ngayTiepNhan: doc.ngayTiepNhan || "",
-            doKhan: doc.doKhan || "-",
+            doKhan: doc.doKhan,
+            trangThai: doc.trangThai,
+            hanXuLy: doc.hanXuLy,
           }))
         );
-      } catch (err) {
-        const message = err instanceof ApiError ? err.message : "Không thể tải văn bản đến";
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadInbox();
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Không thể tải văn bản đến"))
+      .finally(() => setLoading(false));
+    getCurrentUser().then((u) => setCurrentUserId(u.id)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetchUsers({ size: 200 }).then((r) => setUsers(r?.content || [])).catch(() => {});
+    fetchUnits({ size: 100 }).then((r) => setUnits(r?.content || [])).catch(() => {});
+  }, []);
+
+  const reloadDocuments = () => {
+    fetchIncomingDocuments({ page: 0, size: 50 })
+      .then((response) => {
+        setDocuments(
+          (response.content || []).map((doc: DocumentListItem) => ({
+            id: doc.id,
+            soKyHieu: doc.soKyHieu || "-",
+            trichYeu: doc.trichYeu,
+            tenLoaiVanBan: doc.tenLoaiVanBan,
+            donViBanHanh: doc.donViBanHanh || "-",
+            ngayTiepNhan: doc.ngayTiepNhan || "",
+            doKhan: doc.doKhan,
+            trangThai: doc.trangThai,
+            hanXuLy: doc.hanXuLy,
+          }))
+        );
+      })
+      .catch(() => {});
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === documents.length && documents.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(documents.map((d) => d.id)));
+    }
+  };
+
+  const openTransfer = (doc: VanBanDen) => {
+    setTransferDoc(doc);
+    setTransferForm({ nguoiNhanId: "", donViXuLyId: "", noiDungChuyen: "", hanXuLy: doc.hanXuLy || "" });
+    setTransferResult(null);
+    setShowTransfer(true);
+  };
+
+  const closeTransfer = () => {
+    setShowTransfer(false);
+    setTransferDoc(null);
+    setTransferResult(null);
+  };
+
+  const handleSelfProcess = (doc: VanBanDen) => {
+    navigate(`/documents/${doc.id}`);
+  };
+
+  const handleTransfer = async () => {
+    if (!transferDoc) return;
+    const nguoiNhanId = parseInt(transferForm.nguoiNhanId, 10);
+    if (isNaN(nguoiNhanId)) { setTransferResult("Vui lòng chọn người nhận"); return; }
+    if (!currentUserId) { setTransferResult("Không xác định được người dùng hiện tại"); return; }
+    setTransferSubmitting(true);
+    setTransferResult(null);
+    try {
+      const parsedDonVi = parseInt(transferForm.donViXuLyId, 10);
+      await transferDocument(transferDoc.id, {
+        nguoiGuiId: currentUserId,
+        nguoiNhanId,
+        ...(!isNaN(parsedDonVi) ? { donViXuLyId: parsedDonVi } : {}),
+        hanhDongXuLy: "TRANSFER",
+        ...(transferForm.noiDungChuyen.trim() ? { yKienXuLy: transferForm.noiDungChuyen.trim() } : {}),
+        ...(transferForm.hanXuLy ? { hanXuLy: `${transferForm.hanXuLy}T00:00:00` } : {}),
+      });
+      setTransferResult("success");
+      setDocuments((prev) => prev.filter((d) => d.id !== transferDoc.id));
+      setTimeout(() => { closeTransfer(); }, 1000);
+    } catch (err) {
+      setTransferResult(err instanceof ApiError ? err.message : "Luân chuyển thất bại");
+    } finally {
+      setTransferSubmitting(false);
+    }
+  };
+
+  const handleBatchTransfer = () => {
+    if (selectedIds.size === 0) { setError("Vui lòng chọn ít nhất một văn bản"); return; }
+    const first = documents.find((d) => selectedIds.has(d.id));
+    if (!first) return;
+    openTransfer(first);
+  };
+
+  const exportCsv = () => {
+    const headers = ["Mã", "Loại", "Nội dung", "Nơi gửi", "Ngày tiếp nhận", "Ưu tiên", "Trạng thái"];
+    const rows = documents.map((d) => [
+      d.soKyHieu,
+      d.tenLoaiVanBan || "",
+      `"${d.trichYeu.replace(/"/g, '""')}"`,
+      d.donViBanHanh,
+      d.ngayTiepNhan ? new Date(d.ngayTiepNhan).toLocaleDateString("vi-VN") : "",
+      getDoKhanBadge(d.doKhan)?.label || "",
+      getTrangThaiBadge(d.trangThai).label,
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `van-ban-den_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <section>
@@ -52,45 +204,194 @@ export default function Inbox() {
           <p>Danh sách văn bản cần xử lý và luân chuyển.</p>
         </div>
         <div className="topbar__actions">
-          <button className="button" type="button">
-            Phân công xử lý
+          <button className="button" type="button" onClick={handleBatchTransfer} disabled={selectedIds.size === 0}>
+            Luân chuyển ({selectedIds.size})
           </button>
-          <button className="button secondary" type="button">
+          <button className="button secondary" type="button" onClick={exportCsv}>
             Xuất báo cáo
           </button>
         </div>
       </div>
 
       <div className="card">
-        {loading && <p>Đang tải...</p>}
-        {error && <p>{error}</p>}
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Mã</th>
-              <th>Nội dung</th>
-              <th>Nơi gửi</th>
-              <th>Ngày</th>
-              <th>Ưu tiên</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((item) => (
-              <tr key={item.id}>
-                <td>{item.soKyHieu}</td>
-                <td>
-                  <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
-                </td>
-                <td>{item.donViBanHanh}</td>
-                <td>{new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN")}</td>
-                <td>
-                  <span className="badge">{item.doKhan}</span>
-                </td>
+        {loading && <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>}
+        {error && <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>}
+        {!loading && !error && documents.length === 0 && (
+          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Chưa có văn bản đến.</p>
+        )}
+
+        {documents.length > 0 && (
+          <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ width: 40, textAlign: "center" }}>
+                  <input type="checkbox" onChange={toggleSelectAll} checked={selectedIds.size === documents.length && documents.length > 0} />
+                </th>
+                <th style={{ whiteSpace: "nowrap" }}>Mã</th>
+                <th style={{ whiteSpace: "nowrap" }}>Loại</th>
+                <th>Nội dung</th>
+                <th style={{ whiteSpace: "nowrap" }}>Nơi gửi</th>
+                <th style={{ whiteSpace: "nowrap" }}>Ngày</th>
+                <th style={{ whiteSpace: "nowrap" }}>Ưu tiên</th>
+                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
+                <th style={{ width: 180, textAlign: "center" }}>Thao tác</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {documents.map((item) => {
+                const khan = getDoKhanBadge(item.doKhan);
+                const stt = getTrangThaiBadge(item.trangThai);
+                const isOverdue = item.hanXuLy && new Date(item.hanXuLy) < new Date();
+                return (
+                  <tr
+                    key={item.id}
+                    style={{
+                      background: selectedIds.has(item.id) ? "rgba(59,130,246,0.05)" : undefined,
+                      verticalAlign: "middle",
+                    }}
+                  >
+                    <td style={{ textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => toggleSelect(item.id)}
+                      />
+                    </td>
+                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
+                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
+                    <td>
+                      <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
+                    </td>
+                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.donViBanHanh}</td>
+                    <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
+                      {item.ngayTiepNhan ? new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
+                      {isOverdue && <span style={{ marginLeft: 4, color: "#ef4444", fontSize: 11 }}>⚠</span>}
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {khan ? <span className={khan.className}>{khan.label}</span> : <span className="badge badge--ghost">-</span>}
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span className={stt.className}>{stt.label}</span>
+                    </td>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                      <button
+                        className="button button--small"
+                        type="button"
+                        onClick={() => handleSelfProcess(item)}
+                        title="Tự xử lý"
+                        style={{ fontSize: 12, padding: "2px 8px", marginRight: 4 }}
+                      >
+                        Tự xử lý
+                      </button>
+                      <button
+                        className="button button--small"
+                        type="button"
+                        onClick={() => openTransfer(item)}
+                        title="Luân chuyển"
+                        style={{ fontSize: 12, padding: "2px 8px" }}
+                      >
+                        Luân chuyển
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {showTransfer && transferDoc && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.4)",
+          }}
+          onClick={closeTransfer}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 12, padding: 28, width: 500, maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Luân chuyển văn bản</h3>
+
+            <div style={{ marginBottom: 16, padding: 12, background: "#f8f9fa", borderRadius: 8, fontSize: 13 }}>
+              <strong>Văn bản:</strong> {transferDoc.soKyHieu} — {transferDoc.trichYeu}
+            </div>
+
+            <div className="form-grid" style={{ gap: 12 }}>
+              <label>
+                Người nhận xử lý <span style={{ color: "#ef4444" }}>*</span>
+                <select
+                  value={transferForm.nguoiNhanId}
+                  onChange={(e) => setTransferForm({ ...transferForm, nguoiNhanId: e.target.value })}
+                >
+                  <option value="">-- Chọn người nhận --</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.hoTen} ({u.tenDonVi || "—"})</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Đơn vị xử lý
+                <select
+                  value={transferForm.donViXuLyId}
+                  onChange={(e) => setTransferForm({ ...transferForm, donViXuLyId: e.target.value })}
+                >
+                  <option value="">-- Chọn đơn vị --</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.id}>{u.tenDonVi}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Nội dung chuyển
+                <textarea
+                  rows={3}
+                  placeholder="Ghi chú nội dung chuyển xử lý..."
+                  value={transferForm.noiDungChuyen}
+                  onChange={(e) => setTransferForm({ ...transferForm, noiDungChuyen: e.target.value })}
+                  style={{ width: "100%", resize: "vertical" }}
+                />
+              </label>
+
+              <label>
+                Hạn xử lý
+                <input
+                  type="date"
+                  value={transferForm.hanXuLy}
+                  onChange={(e) => setTransferForm({ ...transferForm, hanXuLy: e.target.value })}
+                />
+              </label>
+
+              {transferResult === "success" && (
+                <div style={{ padding: 10, borderRadius: 6, background: "rgba(34,197,94,0.1)", color: "#22c55e", textAlign: "center" }}>
+                  Luân chuyển thành công!
+                </div>
+              )}
+              {transferResult && transferResult !== "success" && (
+                <div style={{ padding: 10, borderRadius: 6, background: "rgba(239,68,68,0.1)", color: "#ef4444", textAlign: "center" }}>
+                  {transferResult}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+                <button className="button secondary" type="button" onClick={closeTransfer} disabled={transferSubmitting}>
+                  Hủy
+                </button>
+                <button className="button" type="button" onClick={handleTransfer} disabled={transferSubmitting}>
+                  {transferSubmitting ? "Đang xử lý..." : "Xác nhận luân chuyển"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

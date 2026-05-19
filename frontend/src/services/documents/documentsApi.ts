@@ -9,8 +9,18 @@ export type DocumentListItem = {
   donViBanHanh?: string;
   ngayTiepNhan?: string;
   doKhan?: string;
+  doMat?: string;
   hanXuLy?: string;
   trangThai?: number;
+};
+
+export type AttachmentItem = {
+  id: number;
+  tenTep: string;
+  duongDanTep?: string;
+  loaiTep?: string;
+  kichThuoc?: number;
+  ngayTaiLen?: string;
 };
 
 export type DocumentDetail = {
@@ -30,6 +40,7 @@ export type DocumentDetail = {
   trangThai?: number;
   daOCR?: boolean;
   daKySo?: boolean;
+  attachments?: AttachmentItem[];
 };
 
 export const fetchIncomingDocuments = (params?: {

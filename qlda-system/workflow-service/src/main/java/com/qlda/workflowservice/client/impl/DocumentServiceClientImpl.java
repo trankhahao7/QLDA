@@ -6,10 +6,12 @@ import com.qlda.workflowservice.client.dto.DocumentDetailDto;
 import com.qlda.workflowservice.client.dto.DocumentStatusUpdateRequest;
 import com.qlda.workflowservice.client.dto.DocumentWorkflowStatusUpdateRequest;
 import com.qlda.workflowservice.client.internal.DocumentServiceHttpClient;
+import com.qlda.workflowservice.common.ApiResponse;
 import com.qlda.workflowservice.exception.ApiException;
 import com.qlda.workflowservice.exception.ErrorCode;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -17,12 +19,17 @@ import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentServiceClientImpl implements DocumentServiceClient {
     private final DocumentServiceHttpClient documentServiceHttpClient;
 
     @Override
     public DocumentDetailDto getDocumentById(Long id) {
-        return execute(() -> documentServiceHttpClient.getDocumentById(id));
+        ApiResponse<DocumentDetailDto> apiResponse = execute(() -> documentServiceHttpClient.getDocumentById(id));
+        if (apiResponse == null || apiResponse.data() == null) {
+            throw new ApiException(ErrorCode.DOCUMENT_NOT_FOUND, HttpStatus.NOT_FOUND, "Document not found");
+        }
+        return apiResponse.data();
     }
 
     @Override
@@ -44,6 +51,7 @@ public class DocumentServiceClientImpl implements DocumentServiceClient {
         try {
             return supplier.get();
         } catch (FeignException exception) {
+            log.error("Feign call failed: status={}, message={}", exception.status(), exception.getMessage());
             throw mapFeignException(exception);
         }
     }
@@ -52,6 +60,7 @@ public class DocumentServiceClientImpl implements DocumentServiceClient {
         try {
             runnable.run();
         } catch (FeignException exception) {
+            log.error("Feign call failed: status={}, message={}", exception.status(), exception.getMessage());
             throw mapFeignException(exception);
         }
     }

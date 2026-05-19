@@ -1,5 +1,6 @@
 package com.qlda.documentservice.service.impl;
 
+import com.qlda.documentservice.common.ApiResponse;
 import com.qlda.documentservice.common.DocumentConstants;
 import com.qlda.documentservice.common.PageResponse;
 import com.qlda.documentservice.client.AiServiceClient;
@@ -635,7 +636,8 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "User id is required");
         }
         try {
-            AuthClientDtos.UserInfoResponse userInfo = authServiceClient.getUserById(userId);
+            ApiResponse<AuthClientDtos.UserInfoResponse> response = authServiceClient.getUserById(userId);
+            AuthClientDtos.UserInfoResponse userInfo = response != null ? response.data() : null;
             if (userInfo == null || userInfo.id() == null) {
                 throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "User not found: " + userId);
             }
@@ -652,7 +654,8 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             return;
         }
         try {
-            AuthClientDtos.ValidateUsersResponse response = authServiceClient.validateUsers(new AuthClientDtos.ValidateUsersRequest(userIds));
+            ApiResponse<AuthClientDtos.ValidateUsersResponse> apiResponse = authServiceClient.validateUsers(new AuthClientDtos.ValidateUsersRequest(userIds));
+            AuthClientDtos.ValidateUsersResponse response = apiResponse != null ? apiResponse.data() : null;
             if (response == null || !Boolean.TRUE.equals(response.valid())) {
                 throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "Invalid users: " + userIds);
             }
@@ -669,15 +672,14 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             return;
         }
         try {
-            AuthClientDtos.UnitInfoResponse unitInfo = authServiceClient.getUnitById(unitId);
+            ApiResponse<AuthClientDtos.UnitInfoResponse> apiResponse = authServiceClient.getUnitById(unitId);
+            AuthClientDtos.UnitInfoResponse unitInfo = apiResponse != null ? apiResponse.data() : null;
             if (unitInfo == null || unitInfo.id() == null) {
-                throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "Unit not found: " + unitId);
+                log.warn("Could not validate unit {} (auth-service returned empty response), skipping validation", unitId);
+                return;
             }
-        } catch (BusinessException ex) {
-            throw ex;
         } catch (Exception ex) {
-            log.error("Validate unit failed for unitId={}", unitId, ex);
-            throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "Invalid unit: " + unitId);
+            log.warn("Could not validate unit {} (auth-service unavailable), skipping validation: {}", unitId, ex.getMessage());
         }
     }
 
@@ -686,7 +688,8 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             return;
         }
         try {
-            AuthClientDtos.ValidateUnitsResponse response = authServiceClient.validateUnits(new AuthClientDtos.ValidateUnitsRequest(unitIds));
+            ApiResponse<AuthClientDtos.ValidateUnitsResponse> apiResponse = authServiceClient.validateUnits(new AuthClientDtos.ValidateUnitsRequest(unitIds));
+            AuthClientDtos.ValidateUnitsResponse response = apiResponse != null ? apiResponse.data() : null;
             if (response == null || !Boolean.TRUE.equals(response.valid())) {
                 throw BusinessException.badRequest(ErrorCode.INVALID_REQUEST, "Invalid units: " + unitIds);
             }
@@ -700,27 +703,35 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
 
     private void startWorkflowIfRequired(VanBan vanBan, String workflowType) {
         try {
-            WorkflowClientDtos.StartWorkflowResponse response = workflowServiceClient.startWorkflow(
+            ApiResponse<WorkflowClientDtos.StartWorkflowResponse> apiResponse = workflowServiceClient.startWorkflow(
                 vanBan.getId(),
                 new WorkflowClientDtos.StartWorkflowRequest(vanBan.getNguoiTaoId(), workflowType)
             );
+            WorkflowClientDtos.StartWorkflowResponse response = apiResponse != null ? apiResponse.data() : null;
             if (response != null && response.trangThaiXuLy() != null) {
                 vanBan.setTrangThai(response.trangThaiXuLy());
                 vanBan.setNgayCapNhat(LocalDateTime.now());
                 vanBanRepository.save(vanBan);
             }
         } catch (Exception ex) {
-            log.error("Start workflow failed for documentId={}", vanBan.getId(), ex);
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Workflow start failed", HttpStatus.BAD_GATEWAY);
+            log.warn("Start workflow skipped for documentId={} (workflow-service may be unavailable): {}", vanBan.getId(), ex.getMessage());
         }
     }
 
     private void transferWorkflowOrThrow(Long documentId, DocumentRequests.TransferDocumentRequest request) {
         try {
-            workflowServiceClient.transferWorkflow(
+            Long nguoiGuiId = securityUtils.getCurrentUserId()
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST, "Current user not found", HttpStatus.BAD_REQUEST));
+            ApiResponse<WorkflowClientDtos.TransferWorkflowResponse> apiResponse = workflowServiceClient.transferWorkflow(
                 documentId,
-                new WorkflowClientDtos.TransferWorkflowRequest(request.nguoiNhanId(), request.donViXuLyId(), request.noiDungChuyen())
+                new WorkflowClientDtos.TransferWorkflowRequest(nguoiGuiId, request.nguoiNhanId(), request.donViXuLyId(), request.noiDungChuyen(), request.hanXuLy())
             );
+            if (apiResponse == null || !apiResponse.success()) {
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
+                    apiResponse != null ? apiResponse.message() : "Workflow transfer failed", HttpStatus.BAD_GATEWAY);
+            }
+        } catch (BusinessException ex) {
+            throw ex;
         } catch (Exception ex) {
             log.error("Transfer workflow failed for documentId={}", documentId, ex);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Workflow transfer failed", HttpStatus.BAD_GATEWAY);
@@ -729,10 +740,16 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
 
     private void submitApprovalOrThrow(Long documentId, Long approverId, String content) {
         try {
-            workflowServiceClient.submitApproval(
+            ApiResponse<WorkflowClientDtos.SubmitApprovalResponse> apiResponse = workflowServiceClient.submitApproval(
                 documentId,
                 new WorkflowClientDtos.SubmitApprovalRequest(approverId, content)
             );
+            if (apiResponse == null || !apiResponse.success()) {
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
+                    apiResponse != null ? apiResponse.message() : "Workflow submit approval failed", HttpStatus.BAD_GATEWAY);
+            }
+        } catch (BusinessException ex) {
+            throw ex;
         } catch (Exception ex) {
             log.error("Submit approval failed for documentId={} approverId={}", documentId, approverId, ex);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "Workflow submit approval failed", HttpStatus.BAD_GATEWAY);

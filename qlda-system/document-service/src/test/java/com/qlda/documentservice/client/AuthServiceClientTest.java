@@ -3,6 +3,7 @@ package com.qlda.documentservice.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.qlda.documentservice.client.dto.AuthClientDtos;
+import com.qlda.documentservice.common.ApiResponse;
 import java.io.IOException;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -46,16 +47,18 @@ class AuthServiceClientTest {
         mockWebServer.enqueue(new MockResponse()
             .setHeader("Content-Type", "application/json")
             .setBody("""
-                {"id":1,"username":"nva","hoTen":"Nguyen Van A","email":"nva@company.com","donViId":1}
+                {"success":true,"message":"ok","data":{"id":1,"username":"nva","hoTen":"Nguyen Van A","email":"nva@company.com","donViId":1},"errorCode":null}
                 """));
 
-        AuthClientDtos.UserInfoResponse response = authServiceClient.getUserById(1L);
+        ApiResponse<AuthClientDtos.UserInfoResponse> response = authServiceClient.getUserById(1L);
 
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getPath()).isEqualTo("/internal/auth/users/1");
         assertThat(request.getHeader("Authorization")).isEqualTo("Bearer internal-token");
         assertThat(request.getHeader("X-Service-Name")).isEqualTo("document-service");
-        assertThat(response.id()).isEqualTo(1L);
-        assertThat(response.username()).isEqualTo("nva");
+        assertThat(response.success()).isTrue();
+        assertThat(response.data()).isNotNull();
+        assertThat(response.data().id()).isEqualTo(1L);
+        assertThat(response.data().username()).isEqualTo("nva");
     }
 }

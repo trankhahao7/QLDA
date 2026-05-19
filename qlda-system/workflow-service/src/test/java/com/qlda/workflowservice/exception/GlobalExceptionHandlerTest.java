@@ -20,8 +20,8 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(ex);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertFalse(response.getBody().isSuccess());
-        assertEquals("INVALID_WORKFLOW_STATUS", response.getBody().getErrorCode());
+        assertFalse(response.getBody().success());
+        assertEquals("INVALID_WORKFLOW_STATUS", response.getBody().errorCode());
     }
 
     @Test
@@ -29,6 +29,6 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ApiResponse<Void>> response = handler.handleAccessDenied(new AccessDeniedException("deny"));
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("FORBIDDEN", response.getBody().getErrorCode());
+        assertEquals("FORBIDDEN", response.getBody().errorCode());
     }
 }

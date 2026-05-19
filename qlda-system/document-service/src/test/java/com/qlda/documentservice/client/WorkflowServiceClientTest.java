@@ -3,6 +3,7 @@ package com.qlda.documentservice.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.qlda.documentservice.client.dto.WorkflowClientDtos;
+import com.qlda.documentservice.common.ApiResponse;
 import java.io.IOException;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -46,16 +47,18 @@ class WorkflowServiceClientTest {
         mockWebServer.enqueue(new MockResponse()
             .setHeader("Content-Type", "application/json")
             .setBody("""
-                {"documentId":11,"currentStep":"Lanh dao phe duyet","trangThaiXuLy":1,"tyLeHoanThanh":60}
+                {"success":true,"message":"ok","data":{"documentId":11,"currentStep":"Lanh dao phe duyet","trangThaiXuLy":1,"tyLeHoanThanh":60},"errorCode":null}
                 """));
 
-        WorkflowClientDtos.WorkflowStatusResponse response = workflowServiceClient.getWorkflowStatus(11L);
+        ApiResponse<WorkflowClientDtos.WorkflowStatusResponse> response = workflowServiceClient.getWorkflowStatus(11L);
 
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getPath()).isEqualTo("/internal/workflows/documents/11/status");
         assertThat(request.getHeader("Authorization")).isEqualTo("Bearer internal-token");
         assertThat(request.getHeader("X-Service-Name")).isEqualTo("document-service");
-        assertThat(response.documentId()).isEqualTo(11L);
-        assertThat(response.trangThaiXuLy()).isEqualTo(1);
+        assertThat(response.success()).isTrue();
+        assertThat(response.data()).isNotNull();
+        assertThat(response.data().documentId()).isEqualTo(11L);
+        assertThat(response.data().trangThaiXuLy()).isEqualTo(1);
     }
 }

@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -84,6 +85,14 @@ public class AttachmentServiceImpl implements AttachmentService {
         TepDinhKem attachment = tepDinhKemRepository.findById(attachmentId)
             .orElseThrow(() -> BusinessException.notFound(ErrorCode.ATTACHMENT_NOT_FOUND, "Attachment not found"));
         return new DocumentResponses.AttachmentDownloadResponse(attachmentId, attachment.getDuongDanTep());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Resource getFile(Long attachmentId) {
+        TepDinhKem attachment = tepDinhKemRepository.findById(attachmentId)
+            .orElseThrow(() -> BusinessException.notFound(ErrorCode.ATTACHMENT_NOT_FOUND, "Attachment not found"));
+        return fileStorageService.load(attachment.getDuongDanTep());
     }
 
     @Override
