@@ -24,7 +24,11 @@
       "Bash(npx vite *)",
       "Bash(findstr -i sql)",
       "Bash(Get-ChildItem -Recurse \"d:\\\\Tailieuhoctap\\\\QLDA\\\\Fullproject\\\\QLDA\\\\qlda-system\\\\document-service\\\\src\\\\main\\\\java\" -Filter \"*.java\")",
-      "Bash(Select-Object -First 30 -ExpandProperty FullName)"
+      "Bash(Select-Object -First 30 -ExpandProperty FullName)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\HP\\\\.claude\\\\session-data\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\HP\\.claude\\session-data"
     ]
   }
 }

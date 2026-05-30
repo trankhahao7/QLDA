@@ -480,4 +480,92 @@ class DocumentWorkflowServiceImplTest {
             null
         );
     }
+
+    @Test
+    void processOcr_shouldPersistOcrText_whenOcrSucceeds() {
+        VanBan vanBan = existingDocument(402L);
+        when(vanBanRepository.findByIdAndDaXoaFalse(402L)).thenReturn(Optional.of(vanBan));
+        when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(aiServiceClient.ocr(any(AiClientDtos.OcrRequest.class)))
+            .thenReturn(new AiClientDtos.OcrResponse(402L, "van ban goc day du", 95.0, "model-y"));
+
+        service.processOcr(402L, new DocumentRequests.OcrProcessRequest("https://files/doc2.pdf", "vi"));
+
+        assertThat(vanBan.getNoiDungOCR()).isEqualTo("van ban goc day du");
+        assertThat(vanBan.getDaOCR()).isTrue();
+        verify(vanBanRepository).save(vanBan);
+    }
+
+    @Test
+    void processOcr_shouldNotSetOcrText_whenResponseTextIsNull() {
+        VanBan vanBan = existingDocument(403L);
+        when(vanBanRepository.findByIdAndDaXoaFalse(403L)).thenReturn(Optional.of(vanBan));
+        when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(aiServiceClient.ocr(any(AiClientDtos.OcrRequest.class)))
+            .thenReturn(new AiClientDtos.OcrResponse(403L, null, null, "model-z"));
+
+        service.processOcr(403L, new DocumentRequests.OcrProcessRequest("https://files/doc3.pdf", "vi"));
+
+        assertThat(vanBan.getNoiDungOCR()).isNull();
+        assertThat(vanBan.getDaOCR()).isTrue();
+    }
+
+    @Test
+    void createIncoming_autoClassify_shouldPersistCategoryWhenClassifySucceeds() {
+        LoaiVanBan type = createLoaiVanBan(1);
+        when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
+        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok",
+            new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
+        when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
+            VanBan entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(501L);
+            }
+            return entity;
+        });
+        when(workflowServiceClient.startWorkflow(eq(501L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(
+                501L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
+        when(aiServiceClient.classify(any(AiClientDtos.ClassifyRequest.class)))
+            .thenReturn(new AiClientDtos.ClassifyResponse(501L, "Cong van", "Cong van hanh chinh", 0.92, null));
+        when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
+            .thenReturn(new DocumentResponses.DocumentSimpleResponse(501L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
+
+        service.createIncoming(incomingRequest());
+
+        ArgumentCaptor<VanBan> captor = ArgumentCaptor.forClass(VanBan.class);
+        verify(vanBanRepository, atLeastOnce()).save(captor.capture());
+        VanBan lastSave = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertThat(lastSave.getAiPhanLoai()).isEqualTo("Cong van");
+        assertThat(lastSave.getAiConfidence()).isEqualTo(0.92);
+    }
+
+    @Test
+    void createIncoming_autoClassifyFailure_doesNotBreakCreate() {
+        LoaiVanBan type = createLoaiVanBan(1);
+        when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
+        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
+        when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok",
+            new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
+        when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
+            VanBan entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(502L);
+            }
+            return entity;
+        });
+        when(workflowServiceClient.startWorkflow(eq(502L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(
+                502L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
+        when(aiServiceClient.classify(any(AiClientDtos.ClassifyRequest.class)))
+            .thenThrow(new RuntimeException("ai-service down"));
+        when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
+            .thenReturn(new DocumentResponses.DocumentSimpleResponse(502L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
+
+        DocumentResponses.DocumentSimpleResponse response = service.createIncoming(incomingRequest());
+
+        assertThat(response.id()).isEqualTo(502L);
+        verify(aiServiceClient).classify(any(AiClientDtos.ClassifyRequest.class));
+    }
 }

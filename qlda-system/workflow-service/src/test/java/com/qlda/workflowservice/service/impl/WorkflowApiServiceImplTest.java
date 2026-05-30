@@ -9,6 +9,7 @@ import com.qlda.workflowservice.dto.request.*;
 import com.qlda.workflowservice.dto.response.*;
 import com.qlda.workflowservice.entity.BuocQuyTrinh;
 import com.qlda.workflowservice.entity.QuyTrinh;
+import com.qlda.workflowservice.entity.UyQuyen;
 import com.qlda.workflowservice.entity.XuLyVanBan;
 import com.qlda.workflowservice.event.NotificationEvent;
 import com.qlda.workflowservice.event.publisher.NotificationEventPublisher;
@@ -16,6 +17,7 @@ import com.qlda.workflowservice.exception.ApiException;
 import com.qlda.workflowservice.exception.ErrorCode;
 import com.qlda.workflowservice.repository.BuocQuyTrinhRepository;
 import com.qlda.workflowservice.repository.QuyTrinhRepository;
+import com.qlda.workflowservice.repository.UyQuyenRepository;
 import com.qlda.workflowservice.repository.XuLyVanBanRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,8 @@ class WorkflowApiServiceImplTest {
     private BuocQuyTrinhRepository buocQuyTrinhRepository;
     @Mock
     private XuLyVanBanRepository xuLyVanBanRepository;
+    @Mock
+    private UyQuyenRepository uyQuyenRepository;
     @Mock
     private DocumentServiceClient documentServiceClient;
     @Mock
@@ -336,17 +340,29 @@ class WorkflowApiServiceImplTest {
 
     @Test
     void createAndCancelDelegation_success() {
+        UyQuyen entity = UyQuyen.builder()
+                .id(10L).nguoiUyQuyenId(1L).nguoiDuocUyQuyenId(2L)
+                .tuNgay(LocalDate.now()).denNgay(LocalDate.now().plusDays(3))
+                .phamViUyQuyen("APPROVE").ghiChu("N").active(true).build();
+        when(uyQuyenRepository.save(any(UyQuyen.class))).thenReturn(entity);
+        when(uyQuyenRepository.findById(10L)).thenReturn(Optional.of(entity));
+
         DelegationResponse created = service.createDelegation(
                 new DelegationCreateRequest(1L, 2L, LocalDate.now(), LocalDate.now().plusDays(3), "APPROVE", "N"));
 
         assertNotNull(created.id());
+        assertEquals(1L, created.nguoiUyQuyenId());
+        assertTrue(created.active());
 
         IdResponse canceled = service.cancelDelegation(created.id());
         assertEquals(created.id(), canceled.id());
+        verify(uyQuyenRepository, atLeastOnce()).save(any(UyQuyen.class));
     }
 
     @Test
     void cancelDelegation_notFound() {
+        when(uyQuyenRepository.findById(999L)).thenReturn(Optional.empty());
+
         ApiException ex = assertThrows(ApiException.class, () -> service.cancelDelegation(999L));
         assertEquals(ErrorCode.INVALID_REQUEST, ex.getErrorCode());
         assertEquals(HttpStatus.NOT_FOUND, ex.getHttpStatus());
@@ -565,8 +581,15 @@ class WorkflowApiServiceImplTest {
 
     @Test
     void getDelegations_filterByUser() {
-        service.createDelegation(new DelegationCreateRequest(1L, 2L, LocalDate.now(), LocalDate.now().plusDays(1), "APPROVE", null));
-        service.createDelegation(new DelegationCreateRequest(3L, 4L, LocalDate.now(), LocalDate.now().plusDays(1), "APPROVE", null));
+        UyQuyen d1 = UyQuyen.builder()
+                .id(1L).nguoiUyQuyenId(1L).nguoiDuocUyQuyenId(2L)
+                .tuNgay(LocalDate.now()).denNgay(LocalDate.now().plusDays(1))
+                .phamViUyQuyen("APPROVE").active(true).build();
+        UyQuyen d2 = UyQuyen.builder()
+                .id(2L).nguoiUyQuyenId(3L).nguoiDuocUyQuyenId(4L)
+                .tuNgay(LocalDate.now()).denNgay(LocalDate.now().plusDays(1))
+                .phamViUyQuyen("APPROVE").active(true).build();
+        when(uyQuyenRepository.findAll()).thenReturn(List.of(d1, d2));
 
         PageResponse<DelegationResponse> result = service.getDelegations(1L, null, null, PageRequest.of(0, 10));
 
