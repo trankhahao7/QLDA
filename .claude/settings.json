@@ -21,7 +21,10 @@
       "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c ' *)",
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(findstr -i sql)",
+      "Bash(Get-ChildItem -Recurse \"d:\\\\Tailieuhoctap\\\\QLDA\\\\Fullproject\\\\QLDA\\\\qlda-system\\\\document-service\\\\src\\\\main\\\\java\" -Filter \"*.java\")",
+      "Bash(Select-Object -First 30 -ExpandProperty FullName)"
     ]
   }
 }

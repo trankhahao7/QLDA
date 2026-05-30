@@ -58,6 +58,15 @@ services:
   ai-service:
     base-url: ${AI_SERVICE_URL:http://localhost:8084}
 
+office365:
+  tenant-id: ${OFFICE365_TENANT_ID:}
+  client-id: ${OFFICE365_CLIENT_ID:}
+  client-secret: ${OFFICE365_CLIENT_SECRET:}
+  sharepoint:
+    enabled: ${SHAREPOINT_ENABLED:false}
+    site-id: ${SHAREPOINT_SITE_ID:}
+    upload-path: ${SHAREPOINT_UPLOAD_PATH:eOIS/VanBan}
+
 internal:
   auth:
     service-name: ${INTERNAL_SERVICE_NAME:document-service}

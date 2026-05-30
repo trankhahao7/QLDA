@@ -67,6 +67,8 @@ app:
   notification:
     email:
       from: ${OUTLOOK_SMTP_FROM:${OUTLOOK_SMTP_USERNAME:}}
+    teams:
+      webhook-url: ${TEAMS_WEBHOOK_URL:}
 
   kafka:
     notification-topic: ${NOTIFICATION_EVENTS_TOPIC:notification-events}

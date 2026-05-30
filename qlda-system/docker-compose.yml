@@ -115,6 +115,12 @@ services:
       APP_UPLOAD_DIR: /app/uploads
       INTERNAL_SERVICE_NAME: document-service
       INTERNAL_SERVICE_TOKEN: change-me-in-dev
+      OFFICE365_TENANT_ID: ${OFFICE365_TENANT_ID:-}
+      OFFICE365_CLIENT_ID: ${OFFICE365_CLIENT_ID:-}
+      OFFICE365_CLIENT_SECRET: ${OFFICE365_CLIENT_SECRET:-}
+      SHAREPOINT_ENABLED: ${SHAREPOINT_ENABLED:-false}
+      SHAREPOINT_SITE_ID: ${SHAREPOINT_SITE_ID:-}
+      SHAREPOINT_UPLOAD_PATH: ${SHAREPOINT_UPLOAD_PATH:-eOIS/VanBan}
     volumes:
       - document-uploads:/app/uploads
     networks:
@@ -206,9 +212,10 @@ services:
       APP_UPLOAD_DIR: /app/uploads
       INTERNAL_SERVICE_NAME: notification-service
       INTERNAL_SERVICE_TOKEN: change-me-in-dev
-      OUTLOOK_SMTP_USERNAME: ""
-      OUTLOOK_SMTP_PASSWORD: ""
-      OUTLOOK_SMTP_FROM: ""
+      OUTLOOK_SMTP_USERNAME: ${OUTLOOK_SMTP_USERNAME:-}
+      OUTLOOK_SMTP_PASSWORD: ${OUTLOOK_SMTP_PASSWORD:-}
+      OUTLOOK_SMTP_FROM: ${OUTLOOK_SMTP_FROM:-}
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
     volumes:
       - notification-uploads:/app/uploads
     networks:

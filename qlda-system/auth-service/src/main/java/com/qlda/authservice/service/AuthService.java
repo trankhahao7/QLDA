@@ -74,10 +74,12 @@ public class AuthService {
     }
 
     public AuthTokenResponse loginAzure(AzureLoginRequest request, String ipAddress) {
-        AzureAuthService.AzureUserInfo azureUserInfo = azureAuthService.exchangeCodeForUser(request);
-        if (azureUserInfo == null || !StringUtils.hasText(azureUserInfo.azureAdId())) {
+        AzureAuthService.AzureAuthResult authResult = azureAuthService.exchangeCodeForUser(request);
+        if (authResult == null || !StringUtils.hasText(authResult.userInfo().azureAdId())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, ErrorCode.AZURE_AUTH_FAILED, "Azure login failed");
         }
+
+        AzureAuthService.AzureUserInfo azureUserInfo = authResult.userInfo();
 
         Optional<NguoiDung> byAzureId = nguoiDungRepository.findByAzureAdId(azureUserInfo.azureAdId());
         Optional<NguoiDung> byEmail = StringUtils.hasText(azureUserInfo.email())
@@ -95,6 +97,10 @@ public class AuthService {
         user.setAzureAdId(azureUserInfo.azureAdId());
         user.setLanDangNhapCuoi(LocalDateTime.now());
         user.setNgayCapNhat(LocalDateTime.now());
+        if (StringUtils.hasText(authResult.microsoftRefreshToken())) {
+            user.setMicrosoftRefreshToken(authResult.microsoftRefreshToken());
+            user.setMicrosoftTokenExpiry(LocalDateTime.now().plusDays(60));
+        }
         nguoiDungRepository.save(user);
 
         AuthTokenResponse response = issueAuthTokenResponse(user);

@@ -54,6 +54,12 @@ public class NguoiDung {
     @Column(name = "AzureAD_ID", length = 100)
     private String azureAdId;
 
+    @Column(name = "MicrosoftRefreshToken", columnDefinition = "TEXT")
+    private String microsoftRefreshToken;
+
+    @Column(name = "MicrosoftTokenExpiry")
+    private LocalDateTime microsoftTokenExpiry;
+
     @Column(name = "TrangThai")
     private Integer trangThai;
 

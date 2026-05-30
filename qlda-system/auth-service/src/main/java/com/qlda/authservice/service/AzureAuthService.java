@@ -47,7 +47,7 @@ public class AzureAuthService {
         this.restClient = restClientBuilder.build();
     }
 
-    public AzureUserInfo exchangeCodeForUser(AzureLoginRequest request) {
+    public AzureAuthResult exchangeCodeForUser(AzureLoginRequest request) {
         AuthProperties.Azure azure = authProperties.getAzure();
         if (!isAzureConfigured(azure)
                 || !StringUtils.hasText(request.authorizationCode())
@@ -60,11 +60,14 @@ public class AzureAuthService {
             return null;
         }
 
-        AzureUserInfo fromIdToken = resolveUserFromIdToken(azure, tokenResponse.idToken());
-        if (fromIdToken != null) {
-            return fromIdToken;
+        AzureUserInfo userInfo = resolveUserFromIdToken(azure, tokenResponse.idToken());
+        if (userInfo == null) {
+            userInfo = resolveUserFromGraph(tokenResponse.accessToken(), isAzureConfigured(azure));
         }
-        return resolveUserFromGraph(tokenResponse.accessToken(), isAzureConfigured(azure));
+        if (userInfo == null) {
+            return null;
+        }
+        return new AzureAuthResult(userInfo, tokenResponse.refreshToken());
     }
 
     private OAuthTokenResponse exchangeAuthorizationCode(AuthProperties.Azure azure, AzureLoginRequest request) {
@@ -204,11 +207,19 @@ public class AzureAuthService {
     ) {
     }
 
+    public record AzureAuthResult(
+            AzureUserInfo userInfo,
+            String microsoftRefreshToken
+    ) {
+    }
+
     private record OAuthTokenResponse(
             @JsonProperty("access_token")
             String accessToken,
             @JsonProperty("id_token")
-            String idToken
+            String idToken,
+            @JsonProperty("refresh_token")
+            String refreshToken
     ) {
     }
 

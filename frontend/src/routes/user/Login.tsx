@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { setAccessToken, getApiBaseUrl } from "../../services/core/apiClient";
+import { setAccessToken } from "../../services/core/apiClient";
 import { loginAzure } from "../../services/auth/authApi";
 import { msalConfig } from "../../config/msal.config";
 import "../../styles/login.css";
@@ -32,11 +32,7 @@ function generateState(): string {
 function validateState(state: string | null): boolean {
   const saved = sessionStorage.getItem("azure_oauth_state");
   sessionStorage.removeItem("azure_oauth_state");
-  if (!state || !saved || state !== saved) {
-    console.error("[AZURE DEBUG] State mismatch - possible CSRF attack");
-    return false;
-  }
-  return true;
+  return !!(state && saved && state === saved);
 }
 
 async function buildAzureAuthorizeUrl(): Promise<string> {
@@ -59,12 +55,6 @@ async function buildAzureAuthorizeUrl(): Promise<string> {
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-
-  const addDebug = (msg: string) => {
-    console.log("[AZURE DEBUG]", msg);
-    setDebugInfo((prev) => [...prev, msg]);
-  };
 
   const processedRef = useRef(false);
 
@@ -98,7 +88,8 @@ export default function Login() {
     loginAzure(code, REDIRECT_URI, codeVerifier)
       .then((data) => {
         setAccessToken(data.accessToken);
-        window.location.href = "/admin/dashboard";
+        const roles = data.user?.roles ?? [];
+        window.location.href = roles.includes("ADMIN") ? "/admin/dashboard" : "/dashboard";
       })
       .catch((err) => {
         const errMsg = err.errorCode
@@ -112,16 +103,11 @@ export default function Login() {
   const handleAzureLogin = async () => {
     setLoading(true);
     setErrorMessage(null);
-    setDebugInfo([]);
 
     try {
       const url = await buildAzureAuthorizeUrl();
-      addDebug(`Redirecting to Azure AD...`);
-      addDebug(`Authorize URL: ${url}`);
-      sessionStorage.setItem("azure_login_start", Date.now().toString());
       window.location.href = url;
     } catch (err) {
-      addDebug(`Failed to build authorize URL: ${err}`);
       setErrorMessage("Lỗi tạo request: " + (err instanceof Error ? err.message : String(err)));
       setLoading(false);
     }
@@ -170,14 +156,6 @@ export default function Login() {
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Đăng nhập thất bại</div>
               <div>{errorMessage}</div>
             </div>
-          )}
-          {debugInfo.length > 0 && !errorMessage && !loading && (
-            <details style={{ marginBottom: 12, fontSize: 11, color: "#666", textAlign: "left" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 500 }}>Xem debug log</summary>
-              <pre style={{ marginTop: 6, padding: 8, background: "#f5f5f5", borderRadius: 4, maxHeight: 200, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                {debugInfo.map((line, i) => `[${i + 1}] ${line}`).join("\n")}
-              </pre>
-            </details>
           )}
           <button className="office-btn azure-btn" onClick={handleAzureLogin} disabled={loading}>
             <img src="https://img.icons8.com/color/48/azure-1.png" alt="Azure AD Icon" />
