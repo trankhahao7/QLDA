@@ -23,6 +23,7 @@ import com.qlda.documentservice.repository.LoaiVanBanRepository;
 import com.qlda.documentservice.repository.TepDinhKemRepository;
 import com.qlda.documentservice.repository.VanBanRepository;
 import com.qlda.documentservice.security.SecurityUtils;
+import com.qlda.documentservice.service.DigitalSignatureService;
 import com.qlda.documentservice.service.DocumentWorkflowService;
 import com.qlda.documentservice.service.FileStorageService;
 import com.qlda.documentservice.service.SharePointService;
@@ -64,6 +65,7 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
     private final AiServiceClient aiServiceClient;
     private final NotificationEventPublisher notificationEventPublisher;
     private final Optional<SharePointService> sharePointService;
+    private final DigitalSignatureService digitalSignatureService;
 
     private final Map<Long, String> ocrFileStore = new ConcurrentHashMap<>();
     private final Map<Long, List<DocumentResponses.DocumentVersionResponse>> versionsStore = new ConcurrentHashMap<>();
@@ -79,7 +81,8 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
         WorkflowServiceClient workflowServiceClient,
         AiServiceClient aiServiceClient,
         NotificationEventPublisher notificationEventPublisher,
-        Optional<SharePointService> sharePointService
+        Optional<SharePointService> sharePointService,
+        DigitalSignatureService digitalSignatureService
     ) {
         this.vanBanRepository = vanBanRepository;
         this.loaiVanBanRepository = loaiVanBanRepository;
@@ -92,6 +95,7 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
         this.aiServiceClient = aiServiceClient;
         this.notificationEventPublisher = notificationEventPublisher;
         this.sharePointService = sharePointService;
+        this.digitalSignatureService = digitalSignatureService;
     }
 
     @Override
@@ -329,11 +333,17 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
     @Transactional
     public DocumentResponses.DigitalSignResponse digitalSign(Long id, DocumentRequests.DigitalSignRequest request) {
         VanBan vanBan = getDocumentOrThrow(id);
+        LocalDateTime signedAt = LocalDateTime.now();
         vanBan.setDaKySo(true);
         vanBan.setTrangThai(DocumentConstants.TRANG_THAI_DA_KY);
-        vanBan.setNgayCapNhat(LocalDateTime.now());
+        vanBan.setNgayCapNhat(signedAt);
         vanBanRepository.save(vanBan);
-        return new DocumentResponses.DigitalSignResponse(id, request.nguoiKyId(), true, LocalDateTime.now());
+        try {
+            digitalSignatureService.sign(vanBan, request);
+        } catch (Exception ex) {
+            log.warn("Digital signature record failed for documentId={}, continuing: {}", id, ex.getMessage());
+        }
+        return new DocumentResponses.DigitalSignResponse(id, request.nguoiKyId(), true, signedAt);
     }
 
     @Override

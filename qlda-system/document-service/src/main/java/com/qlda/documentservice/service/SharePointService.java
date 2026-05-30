@@ -72,7 +72,7 @@ public class SharePointService {
 
     /**
      * Called after document is published. Finds the first attachment and uploads it to SharePoint.
-     * Updates DuongDanSharePoint on VanBan on success.
+     * Updates DuongDanSharePoint (view link) and DuongDanOneDrive (edit link) on VanBan on success.
      */
     public void uploadOnPublish(VanBan vanBan) {
         if (!isConfigured()) {
@@ -105,21 +105,32 @@ public class SharePointService {
             String itemId = uploadFile(token, fileName, localFile);
             if (itemId == null) return;
 
-            String sharingLink = createSharingLink(token, itemId);
-            if (StringUtils.hasText(sharingLink)) {
-                vanBan.setDuongDanSharePoint(sharingLink);
-                vanBan.setNgayCapNhat(LocalDateTime.now());
-                vanBanRepository.save(vanBan);
-                log.info("Uploaded documentId={} to SharePoint: {}", vanBan.getId(), sharingLink);
+            String viewLink = createSharingLink(token, itemId, "view");
+            String editLink = createSharingLink(token, itemId, "edit");
+
+            vanBan.setNgayCapNhat(LocalDateTime.now());
+            if (StringUtils.hasText(viewLink)) {
+                vanBan.setDuongDanSharePoint(viewLink);
             }
+            if (StringUtils.hasText(editLink)) {
+                vanBan.setDuongDanOneDrive(editLink);
+            }
+            vanBanRepository.save(vanBan);
+            log.info("Uploaded documentId={} to SharePoint (view={}, edit={})",
+                    vanBan.getId(), viewLink, editLink);
         } catch (IOException ex) {
             log.error("SharePoint upload I/O error for documentId={}: {}", vanBan.getId(), ex.getMessage(), ex);
         }
     }
 
-    /** Returns the stored SharePoint link for a document, or null if not yet uploaded. */
+    /** Returns the stored SharePoint view link for a document, or null if not yet uploaded. */
     public String getSharingLink(VanBan vanBan) {
         return vanBan.getDuongDanSharePoint();
+    }
+
+    /** Returns the stored OneDrive edit link (Word Online) for a document, or null if not yet uploaded. */
+    public String getEditLink(VanBan vanBan) {
+        return vanBan.getDuongDanOneDrive();
     }
 
     private String uploadFile(String token, String fileName, Path localFile) throws IOException {
@@ -141,9 +152,9 @@ public class SharePointService {
         }
     }
 
-    private String createSharingLink(String token, String itemId) {
+    private String createSharingLink(String token, String itemId, String type) {
         String uri = GRAPH_BASE + "/sites/" + siteId + "/drive/items/" + itemId + "/createLink";
-        Map<String, String> body = Map.of("type", "view", "scope", "organization");
+        Map<String, String> body = Map.of("type", type, "scope", "organization");
 
         try {
             GraphShareLinkResponse response = restClient.post()
@@ -155,7 +166,7 @@ public class SharePointService {
                     .body(GraphShareLinkResponse.class);
             return (response != null && response.link() != null) ? response.link().webUrl() : null;
         } catch (RestClientException ex) {
-            log.error("Create sharing link failed for itemId={}: {}", itemId, ex.getMessage(), ex);
+            log.error("Create {} sharing link failed for itemId={}: {}", type, itemId, ex.getMessage(), ex);
             return null;
         }
     }

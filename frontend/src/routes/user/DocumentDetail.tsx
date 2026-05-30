@@ -7,6 +7,12 @@ import { getCurrentUser, type AuthUser } from "../../services/auth/authApi";
 import { fetchPendingApprovals, type PendingApprovalItem } from "../../services/workflows/approvalsApi";
 import { approveProcessing, rejectProcessing } from "../../services/workflows/workflowApprovalsApi";
 import { fetchAttachments, triggerDownload } from "../../services/documents/documentAttachmentsApi";
+import {
+  signDocument,
+  getOneDriveEditUrl,
+  getSignatureInfo,
+  type SignatureInfo,
+} from "../../services/documents/documentsPublishApi";
 import type { DocumentDetail as DocDetail } from "../../services/documents/documentsApi";
 import type { AttachmentItem } from "../../services/documents/documentAttachmentsApi";
 import type { WorkflowTimelineItem } from "../../services/workflows/workflowTrackingApi";
@@ -32,6 +38,11 @@ const formatDate = (dateStr?: string) => {
   return new Date(dateStr).toLocaleDateString("vi-VN");
 };
 
+const formatDateTime = (dateStr?: string | null) => {
+  if (!dateStr) return "-";
+  return new Date(dateStr).toLocaleString("vi-VN");
+};
+
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -41,6 +52,11 @@ export default function DocumentDetail() {
   const [timeline, setTimeline] = useState<WorkflowTimelineItem[]>([]);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [pendingApproval, setPendingApproval] = useState<PendingApprovalItem | null>(null);
+  const [oneDriveUrl, setOneDriveUrl] = useState<string | null>(null);
+  const [signatureInfo, setSignatureInfo] = useState<SignatureInfo | null>(null);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [showSigInfoModal, setShowSigInfoModal] = useState(false);
+  const [signNote, setSignNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -68,11 +84,18 @@ export default function DocumentDetail() {
         setTimeline(tl || []);
         setCurrentUser(user);
 
-        const pendingResp = await fetchPendingApprovals({ page: 0, size: 100, nguoiDuyetId: user.id });
+        const [pendingResp, editUrlResp, sigResp] = await Promise.all([
+          fetchPendingApprovals({ page: 0, size: 100, nguoiDuyetId: user.id }),
+          getOneDriveEditUrl(Number(id)).catch(() => ({ data: null })),
+          getSignatureInfo(Number(id)).catch(() => ({ data: null })),
+        ]);
+
         const match = (pendingResp.content || []).find(
           (p) => p.documentId === Number(id)
         );
         setPendingApproval(match || null);
+        setOneDriveUrl((editUrlResp as { data: string | null }).data ?? null);
+        setSignatureInfo((sigResp as { data: SignatureInfo | null }).data ?? null);
       } catch (err) {
         const message = err instanceof ApiError ? err.message : "Không thể tải chi tiết văn bản";
         setError(message);
@@ -126,6 +149,37 @@ export default function DocumentDetail() {
     }
   };
 
+  const handleSign = async () => {
+    if (!currentUser || !id) return;
+    setSubmitting(true);
+    setActionMsg(null);
+    setActionError(null);
+    try {
+      await signDocument(Number(id), {
+        nguoiKyId: currentUser.id,
+        signatureType: "LOCAL_HASH_SHA256",
+        ghiChu: signNote.trim() || undefined,
+      });
+      setActionMsg("Ký số thành công!");
+      setShowSignModal(false);
+      setSignNote("");
+      setDoc((prev) => prev ? { ...prev, daKySo: true, trangThai: 4 } : prev);
+      // Reload signature info
+      getSignatureInfo(Number(id))
+        .then((r) => setSignatureInfo((r as { data: SignatureInfo | null }).data ?? null))
+        .catch(() => null);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Ký số thất bại");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const canSign =
+    currentUser &&
+    (currentUser.roles?.includes("ADMIN") || currentUser.roles?.includes("LANH_DAO")) &&
+    !doc?.daKySo;
+
   const stt = doc ? TRANG_THAI_MAP[doc.trangThai ?? -1] : null;
 
   return (
@@ -147,8 +201,44 @@ export default function DocumentDetail() {
           {/* LEFT COLUMN */}
           <div>
             <div className="card">
-              <h3>{doc.soKyHieu || `VB-${doc.id}`}</h3>
-              <p style={{ fontWeight: 500 }}>{doc.trichYeu}</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>{doc.soKyHieu || `VB-${doc.id}`}</h3>
+                  <p style={{ fontWeight: 500, margin: "4px 0 0" }}>{doc.trichYeu}</p>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {doc.daKySo && (
+                    <button
+                      className="badge badge--success"
+                      style={{ cursor: "pointer", border: "none", background: "#dcfce7" }}
+                      onClick={() => setShowSigInfoModal(true)}
+                      title="Xem thông tin chữ ký số"
+                    >
+                      Đã ký số
+                    </button>
+                  )}
+                  {oneDriveUrl && (
+                    <a
+                      href={oneDriveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button secondary"
+                      style={{ fontSize: 13, padding: "4px 12px", textDecoration: "none" }}
+                    >
+                      Mở trong Word Online
+                    </a>
+                  )}
+                  {canSign && (
+                    <button
+                      className="button"
+                      style={{ fontSize: 13, padding: "4px 12px" }}
+                      onClick={() => { setShowSignModal(true); setActionError(null); }}
+                    >
+                      Ký số
+                    </button>
+                  )}
+                </div>
+              </div>
               <hr />
               <table style={{ width: "100%", fontSize: 14 }}>
                 <tbody>
@@ -287,6 +377,91 @@ export default function DocumentDetail() {
                   ))}
                 </ul>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Digital sign confirmation modal */}
+      {showSignModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        }}>
+          <div className="card" style={{ maxWidth: 420, width: "100%", margin: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Xác nhận ký số</h3>
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              Chữ ký số sẽ được ghi nhận kèm theo hash SHA-256 của tệp đính kèm đầu tiên.
+            </p>
+            <label style={{ fontSize: 13, fontWeight: 500 }}>Ghi chú (tùy chọn)</label>
+            <textarea
+              className="input"
+              placeholder="Nhập ghi chú..."
+              value={signNote}
+              onChange={(e) => setSignNote(e.target.value)}
+              rows={3}
+              style={{ width: "100%", margin: "6px 0 12px" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="button" onClick={handleSign} disabled={submitting}>
+                {submitting ? "Đang ký..." : "Xác nhận ký số"}
+              </button>
+              <button
+                className="button secondary"
+                onClick={() => { setShowSignModal(false); setSignNote(""); setActionError(null); }}
+                disabled={submitting}
+              >
+                Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Signature info modal */}
+      {showSigInfoModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        }}>
+          <div className="card" style={{ maxWidth: 480, width: "100%", margin: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Thông tin chữ ký số</h3>
+            {signatureInfo ? (
+              <table style={{ width: "100%", fontSize: 14 }}>
+                <tbody>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Người ký</td>
+                    <td>{signatureInfo.nguoiKyId ?? "-"}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Thời gian ký</td>
+                    <td>{formatDateTime(signatureInfo.ngayKy)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Loại ký</td>
+                    <td>{signatureInfo.loaiKy || "-"}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Ghi chú</td>
+                    <td>{signatureInfo.ghiChu || "-"}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Hash file</td>
+                    <td style={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: 12 }}>
+                      {signatureInfo.hashFile || "Không có tệp đính kèm"}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Chứng chỉ</td>
+                    <td>{signatureInfo.certInfo || "-"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ color: "var(--text-muted)" }}>Không có thông tin chữ ký.</p>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <button className="button secondary" onClick={() => setShowSigInfoModal(false)}>Đóng</button>
             </div>
           </div>
         </div>

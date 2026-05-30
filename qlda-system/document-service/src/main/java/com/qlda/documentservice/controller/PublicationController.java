@@ -5,6 +5,7 @@ import com.qlda.documentservice.dto.request.DocumentRequests;
 import com.qlda.documentservice.dto.response.DocumentResponses;
 import com.qlda.documentservice.entity.VanBan;
 import com.qlda.documentservice.repository.VanBanRepository;
+import com.qlda.documentservice.service.DigitalSignatureService;
 import com.qlda.documentservice.service.DocumentWorkflowService;
 import com.qlda.documentservice.service.SharePointService;
 import jakarta.validation.Valid;
@@ -26,14 +27,17 @@ public class PublicationController {
     private final DocumentWorkflowService documentWorkflowService;
     private final VanBanRepository vanBanRepository;
     private final Optional<SharePointService> sharePointService;
+    private final DigitalSignatureService digitalSignatureService;
 
     public PublicationController(
             DocumentWorkflowService documentWorkflowService,
             VanBanRepository vanBanRepository,
-            Optional<SharePointService> sharePointService) {
+            Optional<SharePointService> sharePointService,
+            DigitalSignatureService digitalSignatureService) {
         this.documentWorkflowService = documentWorkflowService;
         this.vanBanRepository = vanBanRepository;
         this.sharePointService = sharePointService;
+        this.digitalSignatureService = digitalSignatureService;
     }
 
     @PostMapping("/{id}/digital-sign")
@@ -69,6 +73,24 @@ public class PublicationController {
             return ApiResponse.success("SharePoint integration not enabled or document not yet uploaded", null);
         }
         return ApiResponse.success("SharePoint link retrieved", link);
+    }
+
+    @GetMapping("/{id}/onedrive-edit-url")
+    public ApiResponse<String> getOneDriveEditUrl(@PathVariable Long id) {
+        VanBan vanBan = vanBanRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Document not found"));
+        String editUrl = sharePointService.map(sp -> sp.getEditLink(vanBan)).orElse(null);
+        if (editUrl == null) {
+            return ApiResponse.success("OneDrive edit URL not available (SharePoint not enabled or document not yet uploaded)", null);
+        }
+        return ApiResponse.success("OneDrive edit URL retrieved", editUrl);
+    }
+
+    @GetMapping("/{id}/signature-info")
+    public ApiResponse<DocumentResponses.SignatureInfoResponse> getSignatureInfo(@PathVariable Long id) {
+        return digitalSignatureService.getSignatureInfo(id)
+                .map(info -> ApiResponse.success("Signature info retrieved", info))
+                .orElseGet(() -> ApiResponse.success("Document has not been digitally signed", null));
     }
 }
 

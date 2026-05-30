@@ -183,6 +183,17 @@ public final class DocumentResponses {
     public record NumberGenerateResponse(String soKyHieu) {
     }
 
+    public record SignatureInfoResponse(
+        Long documentId,
+        Long nguoiKyId,
+        LocalDateTime ngayKy,
+        String loaiKy,
+        String ghiChu,
+        String hashFile,
+        String certInfo
+    ) {
+    }
+
     public record NumberCheckResponse(String soKyHieu, Boolean exists) {
     }
 
