@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker --context desktop-linux compose build --no-cache notification-service)",
+      "Bash(docker --context desktop-linux compose build --no-cache api-gateway)",
+      "Bash(docker --context desktop-linux compose build --no-cache ai-service)",
+      "Bash(docker --context desktop-linux compose up -d)",
+      "Bash(Start-Sleep -Seconds 70)",
+      "Bash(curl -s http://localhost:8082/actuator/health)",
+      "Bash(curl -s -X POST http://localhost:8081/api/auth/login/dev -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"123456\"}')",
+      "Bash(docker --context desktop-linux logs qlda-notification-service)",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d qlda -c \"\\\\dt\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -c \"\\\\l\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"\\\\dt\")",
+      "Bash(docker --context desktop-linux compose up -d notification-service)",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT nd.ID, nd.Username, nd.HoTen, nq.TenNhom, nq.MaNhom FROM NguoiDung nd JOIN NhomQuyen nq ON nd.NhomQuyenID = nq.ID WHERE nd.Username = 'admin';\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"\\\\d nhomquyen\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT * FROM nhomquyen LIMIT 5;\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT id, username, hoten, nhomquyenid FROM nguoidung;\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT COUNT\\(*\\) FROM nguoidung;\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c ' *)"
+    ]
+  }
+}

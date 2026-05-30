@@ -6,6 +6,7 @@ import com.qlda.authservice.dto.auth.AuthTokenResponse;
 import com.qlda.authservice.dto.auth.AuthUserResponse;
 import com.qlda.authservice.dto.auth.AzureLoginRequest;
 import com.qlda.authservice.dto.auth.CurrentUserResponse;
+import com.qlda.authservice.dto.auth.DevLoginRequest;
 import com.qlda.authservice.dto.auth.LogoutRequest;
 import com.qlda.authservice.dto.auth.RefreshTokenRequest;
 import com.qlda.authservice.dto.auth.RefreshTokenResponse;
@@ -52,6 +53,24 @@ public class AuthService {
         this.azureAuthService = azureAuthService;
         this.authProperties = authProperties;
         this.auditLogService = auditLogService;
+    }
+
+    public AuthTokenResponse loginDev(DevLoginRequest request, String ipAddress) {
+        if (!authProperties.getDevPassword().isEnabled()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN, "Dev login is disabled");
+        }
+        String devPassword = authProperties.getDevPassword().getValue();
+        if (devPassword == null || !devPassword.equals(request.password())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED, "Invalid credentials");
+        }
+        NguoiDung user = userService.findActiveUserByUsername(request.username());
+        user.setLanDangNhapCuoi(LocalDateTime.now());
+        user.setNgayCapNhat(LocalDateTime.now());
+        nguoiDungRepository.save(user);
+        AuthTokenResponse response = issueAuthTokenResponse(user);
+        auditLogService.log(user.getId(), user.getHoTen(), "DEV_LOGIN", "NguoiDung",
+                user.getId(), "Dev login", ipAddress, 1);
+        return response;
     }
 
     public AuthTokenResponse loginAzure(AzureLoginRequest request, String ipAddress) {

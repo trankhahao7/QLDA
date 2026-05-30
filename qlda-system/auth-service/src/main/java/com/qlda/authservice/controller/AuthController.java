@@ -4,6 +4,7 @@ import com.qlda.authservice.common.ApiResponse;
 import com.qlda.authservice.dto.auth.AuthTokenResponse;
 import com.qlda.authservice.dto.auth.AzureLoginRequest;
 import com.qlda.authservice.dto.auth.CurrentUserResponse;
+import com.qlda.authservice.dto.auth.DevLoginRequest;
 import com.qlda.authservice.dto.auth.LogoutRequest;
 import com.qlda.authservice.dto.auth.RefreshTokenRequest;
 import com.qlda.authservice.dto.auth.RefreshTokenResponse;
@@ -25,6 +26,14 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+    }
+
+    @PostMapping("/login/dev")
+    public ApiResponse<AuthTokenResponse> loginDev(
+            @Valid @RequestBody DevLoginRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        return ApiResponse.success("Dev login successfully", authService.loginDev(request, httpServletRequest.getRemoteAddr()));
     }
 
     @PostMapping("/login/azure")

@@ -86,15 +86,6 @@ export const apiRequest = async <T,>(
     requestHeaders["Content-Type"] = requestHeaders["Content-Type"] || "application/json";
   }
 
-  // DEBUG: Log request details
-  console.log("[API DEBUG] ===== REQUEST START =====");
-  console.log("[API DEBUG] URL:", buildUrl(path, params));
-  console.log("[API DEBUG] Method:", method);
-  console.log("[API DEBUG] Headers:", requestHeaders);
-  console.log("[API DEBUG] Body:", body);
-  console.log("[API DEBUG] Auth enabled:", auth);
-  console.log("[API DEBUG] Token present:", !!token);
-
   try {
     const response = await fetch(buildUrl(path, params), {
       method,
@@ -107,28 +98,17 @@ export const apiRequest = async <T,>(
       signal: controller.signal,
     });
 
-    // DEBUG: Log response details
-    console.log("[API DEBUG] Response status:", response.status);
-    console.log("[API DEBUG] Response statusText:", response.statusText);
-    console.log("[API DEBUG] Response headers:", Object.fromEntries(response.headers.entries()));
-
     const payload = await parseJson<ApiResponse<T>>(response);
-    console.log("[API DEBUG] Response payload:", payload);
     clearTimeout(timeoutId);
 
     if (!response.ok || !payload?.success) {
       const message = payload?.message || response.statusText || "Request failed";
-      console.error("[API DEBUG] Request failed:", message);
-      console.error("[API DEBUG] Error code:", payload?.errorCode);
       throw new ApiError(message, response.status, payload?.errorCode);
     }
 
-    console.log("[API DEBUG] Request successful, data:", payload.data);
-    console.log("[API DEBUG] ===== REQUEST END =====");
     return payload.data;
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error("[API DEBUG] Request error:", error);
     if (error instanceof ApiError) throw error;
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError("Request timeout", 408);

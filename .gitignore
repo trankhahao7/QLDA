@@ -1,0 +1,65 @@
+# ===== Word Documents =====
+*.docx
+*.doc
+
+# ===== Node.js / Frontend (Vite + React) =====
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ===== Java / Spring Boot (Maven) =====
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# Maven wrapper
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===== Environment & Secrets =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+jwt-keys/
+qlda-system/.env
+**/src/main/resources/private.pem
+**/src/main/resources/public.pem
+
+# ===== IDE / Editor =====
+.idea/
+*.iml
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Docker =====
+.docker/
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== Build artifacts =====
+*.orig
