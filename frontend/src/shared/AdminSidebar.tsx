@@ -7,8 +7,10 @@ const adminNavItems = [
   { to: "/admin/units", label: "Quản lý đơn vị", icon: "🏢" },
   { to: "/admin/document-types", label: "Loại văn bản", icon: "📄" },
   { to: "/admin/workflows", label: "Quy trình xử lý", icon: "⚙️" },
+  { to: "/admin/sla", label: "Quản lý SLA", icon: "⏱️" },
   { to: "/admin/templates", label: "Template văn bản", icon: "📋" },
-  { to: "/admin/monitoring", label: "Giám sát hệ thống", icon: "📈" },
+  { to: "/admin/reports", label: "Báo cáo & Thống kê", icon: "📈" },
+  { to: "/admin/monitoring", label: "Giám sát hệ thống", icon: "🖥️" },
   { to: "/admin/audit-logs", label: "Nhật ký hệ thống", icon: "📝" },
   { to: "/dashboard", label: "Quay lại người dùng", icon: "←" },
 ];

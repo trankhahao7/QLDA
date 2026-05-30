@@ -10,6 +10,10 @@ import NotFound from "./routes/user/NotFound";
 import Profile from "./routes/user/Profile";
 import Search from "./routes/user/Search";
 import Upload from "./routes/user/Upload";
+import Approvals from "./routes/user/Approvals";
+import Notifications from "./routes/user/Notifications";
+import OutgoingDocuments from "./routes/user/OutgoingDocuments";
+import CaseFiles from "./routes/user/CaseFiles";
 import ChatBot from "./shared/ChatBot";
 // Admin components
 import AdminDashboard from "./routes/admin/AdminDashboard";
@@ -21,6 +25,8 @@ import WorkflowManagement from "./routes/admin/WorkflowManagement";
 import TemplateManagement from "./routes/admin/TemplateManagement";
 import SystemMonitoring from "./routes/admin/SystemMonitoring";
 import AuditLogs from "./routes/admin/AuditLogs";
+import Reports from "./routes/admin/Reports";
+import SlaManagement from "./routes/admin/SlaManagement";
 
 function RootRedirect() {
   const { search } = useLocation();
@@ -41,6 +47,10 @@ function App() {
           <Route path="/search" element={<Search />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/documents/:id" element={<DocumentDetail />} />
+          <Route path="/approvals" element={<Approvals />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/outgoing" element={<OutgoingDocuments />} />
+          <Route path="/case-files" element={<CaseFiles />} />
         </Route>
 
         {/* Admin Routes */}
@@ -54,6 +64,8 @@ function App() {
           <Route path="/admin/templates" element={<TemplateManagement />} />
           <Route path="/admin/monitoring" element={<SystemMonitoring />} />
           <Route path="/admin/audit-logs" element={<AuditLogs />} />
+          <Route path="/admin/reports" element={<Reports />} />
+          <Route path="/admin/sla" element={<SlaManagement />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

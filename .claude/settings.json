@@ -18,7 +18,10 @@
       "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT * FROM nhomquyen LIMIT 5;\")",
       "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT id, username, hoten, nhomquyenid FROM nguoidung;\")",
       "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT COUNT\\(*\\) FROM nguoidung;\")",
-      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c ' *)"
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c ' *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npx vite *)"
     ]
   }
 }
