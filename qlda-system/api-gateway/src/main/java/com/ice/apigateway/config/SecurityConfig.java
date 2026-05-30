@@ -53,7 +53,15 @@ public class SecurityConfig {
             .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                .pathMatchers("/api/auth/login/azure", "/api/ai/chatbot/ask").permitAll()
+                .pathMatchers(
+                    "/api/auth/login/azure",
+                    "/api/auth/login/dev",
+                    "/api/auth/refresh-token",
+                    "/api/auth/logout",
+                    "/api/auth/office365/auth-url",
+                    "/api/auth/office365/config/status",
+                    "/api/ai/chatbot/ask"
+                ).permitAll()
                 .pathMatchers("/api/auth/users/**").hasRole("ADMIN")
                 .anyExchange().authenticated()
             )

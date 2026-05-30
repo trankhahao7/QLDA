@@ -1,6 +1,7 @@
 package com.qlda.authservice.controller;
 
 import com.qlda.authservice.common.ApiResponse;
+import com.qlda.authservice.dto.office365.Office365AuthUrlResponse;
 import com.qlda.authservice.dto.office365.Office365ConfigStatusResponse;
 import com.qlda.authservice.dto.office365.Office365ConnectionCheckResponse;
 import com.qlda.authservice.service.Office365Service;
@@ -26,5 +27,10 @@ public class Office365Controller {
     @GetMapping("/connection/check")
     public ApiResponse<Office365ConnectionCheckResponse> checkConnection() {
         return ApiResponse.success("Check Office 365 connection successfully", office365Service.checkConnection());
+    }
+
+    @GetMapping("/auth-url")
+    public ApiResponse<Office365AuthUrlResponse> getAuthUrl() {
+        return ApiResponse.success("Get Office 365 auth URL successfully", office365Service.getAuthUrl());
     }
 }

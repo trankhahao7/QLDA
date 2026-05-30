@@ -48,15 +48,16 @@ class AzureAuthServiceTest {
                         MediaType.APPLICATION_JSON
                 ));
 
-        AzureAuthService.AzureUserInfo info = service.exchangeCodeForUser(
+        AzureAuthService.AzureAuthResult result = service.exchangeCodeForUser(
                 new AzureLoginRequest("sample-code", "http://localhost/callback", "pkce-code-verifier")
         );
 
-        assertNotNull(info);
-        assertEquals("azure-oid-1", info.azureAdId());
-        assertEquals("admin@company.com", info.email());
-        assertEquals("admin@company.com", info.username());
-        assertEquals("Azure Admin", info.displayName());
+        assertNotNull(result);
+        assertNotNull(result.userInfo());
+        assertEquals("azure-oid-1", result.userInfo().azureAdId());
+        assertEquals("admin@company.com", result.userInfo().email());
+        assertEquals("admin@company.com", result.userInfo().username());
+        assertEquals("Azure Admin", result.userInfo().displayName());
         server.verify();
     }
 
@@ -71,11 +72,11 @@ class AzureAuthServiceTest {
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withBadRequest());
 
-        AzureAuthService.AzureUserInfo info = service.exchangeCodeForUser(
+        AzureAuthService.AzureAuthResult result = service.exchangeCodeForUser(
                 new AzureLoginRequest("sample-code", "http://localhost/callback", null)
         );
 
-        assertNull(info);
+        assertNull(result);
         server.verify();
     }
 

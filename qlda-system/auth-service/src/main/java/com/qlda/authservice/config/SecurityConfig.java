@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login/dev").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh-token").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/office365/auth-url").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/office365/config/status").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()

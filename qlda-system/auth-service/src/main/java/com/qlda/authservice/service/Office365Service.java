@@ -1,8 +1,11 @@
 package com.qlda.authservice.service;
 
 import com.qlda.authservice.config.AuthProperties;
+import com.qlda.authservice.dto.office365.Office365AuthUrlResponse;
 import com.qlda.authservice.dto.office365.Office365ConfigStatusResponse;
 import com.qlda.authservice.dto.office365.Office365ConnectionCheckResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -36,6 +39,25 @@ public class Office365Service {
         boolean teams = azureAd && status.teamsConfigured();
         boolean outlook = azureAd && status.outlookConfigured();
         return new Office365ConnectionCheckResponse(azureAd, sharePoint, oneDrive, teams, outlook);
+    }
+
+    public Office365AuthUrlResponse getAuthUrl() {
+        AuthProperties.Azure azure = authProperties.getAzure();
+        if (!StringUtils.hasText(azure.getTenantId()) || !StringUtils.hasText(azure.getClientId())) {
+            return new Office365AuthUrlResponse(null, false);
+        }
+        String redirectUri = StringUtils.hasText(azure.getRedirectUri())
+                ? azure.getRedirectUri()
+                : "http://localhost:5173/auth/callback";
+        String encodedRedirect = URLEncoder.encode(redirectUri, StandardCharsets.UTF_8);
+        String authUrl = "https://login.microsoftonline.com/" + azure.getTenantId()
+                + "/oauth2/v2.0/authorize"
+                + "?client_id=" + azure.getClientId()
+                + "&response_type=code"
+                + "&redirect_uri=" + encodedRedirect
+                + "&scope=openid profile email User.Read"
+                + "&response_mode=query";
+        return new Office365AuthUrlResponse(authUrl, true);
     }
 
     private boolean hasText(String value) {

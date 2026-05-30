@@ -25,7 +25,20 @@
       "Bash(findstr -i sql)",
       "Bash(Get-ChildItem -Recurse \"d:\\\\Tailieuhoctap\\\\QLDA\\\\Fullproject\\\\QLDA\\\\qlda-system\\\\document-service\\\\src\\\\main\\\\java\" -Filter \"*.java\")",
       "Bash(Select-Object -First 30 -ExpandProperty FullName)",
-      "Bash(mkdir -p \"C:\\\\Users\\\\HP\\\\.claude\\\\session-data\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\HP\\\\.claude\\\\session-data\")",
+      "PowerShell(\\(Get-Item \"C:\\\\Users\\\\HP\\\\.claude\\\\session-data\\\\2026-05-30-eois-hotfix-session.tmp\"\\).LastWriteTime; \\(Get-Item \"C:\\\\Users\\\\HP\\\\.claude\\\\session-data\\\\2026-05-30-eois-phase6-session.tmp\"\\).LastWriteTime)",
+      "Bash(docker --context desktop-linux compose -f d:/Tailieuhoctap/QLDA/Fullproject/QLDA/qlda-system/docker-compose.yml up -d)",
+      "Bash(docker --context desktop-linux compose -f d:/Tailieuhoctap/QLDA/Fullproject/QLDA/qlda-system/docker-compose.yml ps)",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U qlda_user -d qlda_db -c ' *)",
+      "Bash(docker --context desktop-linux exec qlda-postgres env)",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename ILIKE 'uyquyen';\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT tablename FROM pg_tables WHERE schemaname='public';\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT nspname, relname FROM pg_class JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace WHERE relkind='r' AND relname ILIKE '%uy%';\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c 'CREATE TABLE IF NOT EXISTS \"UyQuyen\" \\(\"ID\" BIGSERIAL PRIMARY KEY, \"NguoiUyQuyenID\" BIGINT NOT NULL, \"NguoiDuocUyQuyenID\" BIGINT NOT NULL, \"TuNgay\" DATE NOT NULL, \"DenNgay\" DATE NOT NULL, \"PhamViUyQuyen\" VARCHAR\\(100\\), \"GhiChu\" TEXT, \"Active\" BOOLEAN NOT NULL DEFAULT TRUE\\);')",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c 'CREATE INDEX IF NOT EXISTS idx_uyquyen_nguoi_uy ON \"UyQuyen\" \\(\"NguoiUyQuyenID\"\\); CREATE INDEX IF NOT EXISTS idx_uyquyen_nguoi_duoc ON \"UyQuyen\" \\(\"NguoiDuocUyQuyenID\"\\);')",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT relname FROM pg_class JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace WHERE relkind='r' AND relname ILIKE '%uyquyen%';\")",
+      "Bash(docker --context desktop-linux exec qlda-postgres psql -U postgres -d QLDA -c \"SELECT column_name, data_type FROM information_schema.columns WHERE table_name='vanban' AND column_name IN \\('noidungocr','aiphanloai','aiconfidence'\\);\")",
+      "Bash(mvn test *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\HP\\.claude\\session-data"

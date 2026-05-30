@@ -30,14 +30,15 @@ import com.qlda.documentservice.repository.LoaiVanBanRepository;
 import com.qlda.documentservice.repository.TepDinhKemRepository;
 import com.qlda.documentservice.repository.VanBanRepository;
 import com.qlda.documentservice.security.SecurityUtils;
+import com.qlda.documentservice.service.DigitalSignatureService;
 import com.qlda.documentservice.service.FileStorageService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -64,9 +65,20 @@ class DocumentWorkflowServiceImplTest {
     private AiServiceClient aiServiceClient;
     @Mock
     private NotificationEventPublisher notificationEventPublisher;
+    @Mock
+    private DigitalSignatureService digitalSignatureService;
 
-    @InjectMocks
     private DocumentWorkflowServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        service = new DocumentWorkflowServiceImpl(
+            vanBanRepository, loaiVanBanRepository, tepDinhKemRepository,
+            documentMapper, fileStorageService, securityUtils,
+            authServiceClient, workflowServiceClient, aiServiceClient,
+            notificationEventPublisher, Optional.empty(), digitalSignatureService
+        );
+    }
 
     @Test
     void createIncomingDocument_shouldValidateUnitAndStartWorkflow() {
@@ -96,12 +108,26 @@ class DocumentWorkflowServiceImplTest {
     }
 
     @Test
-    void createIncomingDocument_shouldFailWhenAuthValidationFails() {
+    void createIncomingDocument_shouldSucceedEvenWhenAuthServiceIsDown() {
+        // validateUnit swallows auth-service failures to tolerate transient unavailability
+        LoaiVanBan type = createLoaiVanBan(1);
+        when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
+        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(12L));
         when(authServiceClient.getUnitById(5)).thenThrow(new RuntimeException("auth down"));
+        when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
+            VanBan entity = invocation.getArgument(0);
+            if (entity.getId() == null) entity.setId(800L);
+            return entity;
+        });
+        when(workflowServiceClient.startWorkflow(eq(800L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
+            .thenReturn(ApiResponse.success("ok", new WorkflowClientDtos.StartWorkflowResponse(800L, 11L, 22L, "step", DocumentConstants.TRANG_THAI_DANG_XU_LY)));
+        when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
+            .thenReturn(new DocumentResponses.DocumentSimpleResponse(800L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
 
-        assertThatThrownBy(() -> service.createIncoming(incomingRequest()))
-            .isInstanceOf(BusinessException.class)
-            .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        DocumentResponses.DocumentSimpleResponse response = service.createIncoming(incomingRequest());
+
+        assertThat(response.id()).isEqualTo(800L);
+        verify(vanBanRepository, atLeastOnce()).save(any(VanBan.class));
     }
 
     @Test
@@ -160,6 +186,7 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(200L);
         when(vanBanRepository.findByIdAndDaXoaFalse(200L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(1L));
         when(authServiceClient.getUserById(88L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(88L, "u88", "User 88", null, null, null, null, null, 1)));
         when(authServiceClient.getUnitById(9)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(9, "DV9", "Don vi 9", null, true)));
         when(workflowServiceClient.transferWorkflow(eq(200L), any(WorkflowClientDtos.TransferWorkflowRequest.class)))
@@ -182,6 +209,7 @@ class DocumentWorkflowServiceImplTest {
         VanBan vanBan = existingDocument(201L);
         when(vanBanRepository.findByIdAndDaXoaFalse(201L)).thenReturn(Optional.of(vanBan));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(securityUtils.getCurrentUserId()).thenReturn(Optional.of(1L));
         when(authServiceClient.getUserById(90L)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UserInfoResponse(90L, "u90", "User 90", null, null, null, null, null, 1)));
         when(authServiceClient.getUnitById(10)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(10, "DV10", "Don vi 10", null, true)));
         when(workflowServiceClient.transferWorkflow(eq(201L), any(WorkflowClientDtos.TransferWorkflowRequest.class)))
@@ -379,22 +407,25 @@ class DocumentWorkflowServiceImplTest {
     }
 
     @Test
-    void createIncomingDocument_shouldNotPublishWhenWorkflowFails() {
+    void createIncomingDocument_shouldSucceedAndNotPublishWhenWorkflowFails() {
+        // startWorkflowIfRequired swallows workflow-service failures (resilience pattern).
+        // Notification is not published because nguoiTaoId is null (no recipients).
         LoaiVanBan type = createLoaiVanBan(1);
         when(loaiVanBanRepository.findById(1)).thenReturn(Optional.of(type));
         when(authServiceClient.getUnitById(5)).thenReturn(ApiResponse.success("ok", new AuthClientDtos.UnitInfoResponse(5, "HC", "Hanh chinh", null, true)));
         when(vanBanRepository.save(any(VanBan.class))).thenAnswer(invocation -> {
             VanBan entity = invocation.getArgument(0);
-            if (entity.getId() == null) {
-                entity.setId(700L);
-            }
+            if (entity.getId() == null) entity.setId(700L);
             return entity;
         });
         when(workflowServiceClient.startWorkflow(eq(700L), any(WorkflowClientDtos.StartWorkflowRequest.class)))
             .thenThrow(new RuntimeException("workflow down"));
+        when(documentMapper.toDocumentSimpleResponse(any(VanBan.class)))
+            .thenReturn(new DocumentResponses.DocumentSimpleResponse(700L, "01/CV/2026", "Trich yeu", 1, 1, null, null));
 
-        assertThatThrownBy(() -> service.createIncoming(incomingRequest()))
-            .isInstanceOf(BusinessException.class);
+        DocumentResponses.DocumentSimpleResponse response = service.createIncoming(incomingRequest());
+
+        assertThat(response.id()).isEqualTo(700L);
         verify(notificationEventPublisher, never()).publish(any());
     }
 

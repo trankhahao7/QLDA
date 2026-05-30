@@ -135,6 +135,7 @@ public class AuthProperties {
         private String tenantId;
         private String clientId;
         private String clientSecret;
+        private String redirectUri;
 
         public String getTenantId() {
             return tenantId;
@@ -158,6 +159,14 @@ public class AuthProperties {
 
         public void setClientSecret(String clientSecret) {
             this.clientSecret = clientSecret;
+        }
+
+        public String getRedirectUri() {
+            return redirectUri;
+        }
+
+        public void setRedirectUri(String redirectUri) {
+            this.redirectUri = redirectUri;
         }
     }
 

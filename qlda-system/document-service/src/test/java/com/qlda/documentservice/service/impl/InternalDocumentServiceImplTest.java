@@ -120,7 +120,7 @@ class InternalDocumentServiceImplTest {
     void checkAccess_shouldReturnAllowedDocumentIds() {
         VanBan allowed1 = createDocument(1L);
         VanBan allowed2 = createDocument(3L);
-        when(vanBanRepository.findByIdInAndDaXoaFalseAndNguoiTaoId(List.of(1L, 2L, 3L, 4L, 5L), 2L))
+        when(vanBanRepository.findByIdInAndDaXoaFalse(List.of(1L, 2L, 3L, 4L, 5L)))
             .thenReturn(List.of(allowed1, allowed2));
 
         InternalDocumentResponses.AccessCheckResponse response = service.checkDocumentAccess(

@@ -91,14 +91,11 @@ class AuthServiceTest {
     @Test
     void loginAzureShouldIssueTokenWhenMappedByEmail() {
         NguoiDung user = buildActiveUser();
-        AzureAuthService.AzureUserInfo userInfo = new AzureAuthService.AzureUserInfo(
-                "azure-id-1",
-                "admin@company.com",
-                "admin",
-                "Azure Admin",
-                true
+        AzureAuthService.AzureAuthResult authResult = new AzureAuthService.AzureAuthResult(
+                new AzureAuthService.AzureUserInfo("azure-id-1", "admin@company.com", "admin", "Azure Admin", true),
+                null
         );
-        when(azureAuthService.exchangeCodeForUser(any())).thenReturn(userInfo);
+        when(azureAuthService.exchangeCodeForUser(any())).thenReturn(authResult);
         when(nguoiDungRepository.findByAzureAdId("azure-id-1")).thenReturn(Optional.empty());
         when(nguoiDungRepository.findByEmail("admin@company.com")).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(user)).thenReturn("access-token");
