@@ -130,6 +130,7 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             metadata
         );
         requestIndexDocument(saved.getId(), "create incoming");
+        requestAutoClassify(saved);
         return documentMapper.toDocumentSimpleResponse(saved);
     }
 
@@ -227,6 +228,7 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
     }
 
     @Override
+    @Transactional
     public DocumentResponses.OcrProcessResponse processOcr(Long id, DocumentRequests.OcrProcessRequest request) {
         VanBan vanBan = getDocumentOrThrow(id);
         try {
@@ -237,6 +239,9 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             AiClientDtos.OcrResponse response = aiServiceClient.ocr(new AiClientDtos.OcrRequest(id, fileUrl, request.language()));
             vanBan.setDaOCR(true);
             vanBan.setNgayCapNhat(LocalDateTime.now());
+            if (response != null && response.ocrText() != null) {
+                vanBan.setNoiDungOCR(response.ocrText());
+            }
             vanBanRepository.save(vanBan);
             requestIndexDocument(id, "process ocr");
             return new DocumentResponses.OcrProcessResponse(
@@ -831,6 +836,22 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
             aiServiceClient.indexDocument(documentId, new AiClientDtos.IndexDocumentRequest(SOURCE_SERVICE));
         } catch (Exception ex) {
             log.warn("Index document failed after {}: documentId={}", operation, documentId, ex);
+        }
+    }
+
+    private void requestAutoClassify(VanBan vanBan) {
+        try {
+            String content = vanBan.getTrichYeu();
+            AiClientDtos.ClassifyResponse response = aiServiceClient.classify(
+                    new AiClientDtos.ClassifyRequest(vanBan.getId(), content));
+            if (response != null && response.category() != null) {
+                vanBan.setAiPhanLoai(response.category());
+                vanBan.setAiConfidence(response.confidence());
+                vanBan.setNgayCapNhat(LocalDateTime.now());
+                vanBanRepository.save(vanBan);
+            }
+        } catch (Exception ex) {
+            log.warn("Auto-classify failed for documentId={}: {}", vanBan.getId(), ex.getMessage());
         }
     }
 

@@ -20,6 +20,7 @@ const navItems = [
   { to: "/outgoing", label: "Văn bản đi" },
   { to: "/approvals", label: "Phê duyệt" },
   { to: "/case-files", label: "Hồ sơ công việc" },
+  { to: "/delegation", label: "Ủy quyền xử lý" },
   { to: "/upload", label: "Tải lên" },
   { to: "/search", label: "Tìm kiếm" },
   { to: "/profile", label: "Tài khoản" },

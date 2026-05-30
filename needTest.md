@@ -27,3 +27,12 @@ Chạy SQL migration	Execute migrations/V002__chu_ky_so.sql trên QLDA DB
 Rebuild document-service	docker --context desktop-linux compose -f qlda-system/docker-compose.yml up --build -d document-service
 Test ký số	Mở DocumentDetail → click "Ký số" → xác nhận → badge "Đã ký số" xuất hiện
 Test Word Online	Chỉ available khi SHAREPOINT_ENABLED=true + document đã publish → edit link được tạo
+
+5. Việc bạn cần làm:
+
+Action	Lệnh
+Chạy V003 migration	V003__uy_quyen.sql trên QLDA DB
+Chạy V004 migration	V004__vanban_enhancements.sql trên QLDA DB
+Rebuild workflow-service	docker --context desktop-linux compose -f qlda-system/docker-compose.yml up --build -d workflow-service
+Rebuild notification-service	docker --context desktop-linux compose -f qlda-system/docker-compose.yml up --build -d notification-service
+Rebuild document-service	docker --context desktop-linux compose -f qlda-system/docker-compose.yml up --build -d document-service

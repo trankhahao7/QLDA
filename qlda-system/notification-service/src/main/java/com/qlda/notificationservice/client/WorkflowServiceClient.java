@@ -1,5 +1,6 @@
 package com.qlda.notificationservice.client;
 
+import com.qlda.notificationservice.client.dto.SlaViolationClientItem;
 import com.qlda.notificationservice.client.dto.WorkflowProgressClientResponse;
 import com.qlda.notificationservice.client.dto.WorkflowStatisticsClientResponse;
 import java.util.List;
@@ -70,7 +71,7 @@ public class WorkflowServiceClient {
             .block();
     }
 
-    public List<Object> getSlaViolations(String fromDate, String toDate, Long donViId) {
+    public List<SlaViolationClientItem> getSlaViolations(String fromDate, String toDate, Long donViId) {
         return webClient.get()
             .uri(uriBuilder -> {
                 var builder = uriBuilder.path("/internal/workflows/sla/violations");
@@ -86,7 +87,7 @@ public class WorkflowServiceClient {
                 return builder.build();
             })
             .retrieve()
-            .bodyToFlux(Object.class)
+            .bodyToFlux(SlaViolationClientItem.class)
             .collectList()
             .block();
     }

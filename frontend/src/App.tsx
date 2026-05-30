@@ -14,6 +14,7 @@ import Approvals from "./routes/user/Approvals";
 import Notifications from "./routes/user/Notifications";
 import OutgoingDocuments from "./routes/user/OutgoingDocuments";
 import CaseFiles from "./routes/user/CaseFiles";
+import Delegation from "./routes/user/Delegation";
 import ChatBot from "./shared/ChatBot";
 // Admin components
 import AdminDashboard from "./routes/admin/AdminDashboard";
@@ -51,6 +52,7 @@ function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/outgoing" element={<OutgoingDocuments />} />
           <Route path="/case-files" element={<CaseFiles />} />
+          <Route path="/delegation" element={<Delegation />} />
         </Route>
 
         {/* Admin Routes */}

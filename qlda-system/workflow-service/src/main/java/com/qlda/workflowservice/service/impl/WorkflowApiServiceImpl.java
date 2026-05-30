@@ -16,8 +16,10 @@ import com.qlda.workflowservice.event.NotificationEvent;
 import com.qlda.workflowservice.event.publisher.NotificationEventPublisher;
 import com.qlda.workflowservice.exception.ApiException;
 import com.qlda.workflowservice.exception.ErrorCode;
+import com.qlda.workflowservice.entity.UyQuyen;
 import com.qlda.workflowservice.repository.BuocQuyTrinhRepository;
 import com.qlda.workflowservice.repository.QuyTrinhRepository;
+import com.qlda.workflowservice.repository.UyQuyenRepository;
 import com.qlda.workflowservice.repository.XuLyVanBanRepository;
 import com.qlda.workflowservice.service.WorkflowApiService;
 import com.qlda.workflowservice.specification.QuyTrinhSpecification;
@@ -41,8 +43,6 @@ import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Service
@@ -61,13 +61,10 @@ public class WorkflowApiServiceImpl implements WorkflowApiService {
     private final QuyTrinhRepository quyTrinhRepository;
     private final BuocQuyTrinhRepository buocQuyTrinhRepository;
     private final XuLyVanBanRepository xuLyVanBanRepository;
+    private final UyQuyenRepository uyQuyenRepository;
     private final DocumentServiceClient documentServiceClient;
     private final AuthServiceClient authServiceClient;
     private final NotificationEventPublisher notificationEventPublisher;
-
-    // TODO: Replace with DB table when delegation schema is available.
-    private final AtomicLong delegationIdSequence = new AtomicLong(0);
-    private final Map<Long, DelegationRecord> delegationStore = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -269,44 +266,47 @@ public class WorkflowApiServiceImpl implements WorkflowApiService {
     }
 
     @Override
+    @Transactional
     public DelegationResponse createDelegation(DelegationCreateRequest request) {
-        long id = delegationIdSequence.incrementAndGet();
-        DelegationRecord record = new DelegationRecord(
-                id,
-                request.nguoiUyQuyenId(),
-                request.nguoiDuocUyQuyenId(),
-                request.tuNgay(),
-                request.denNgay(),
-                request.phamViUyQuyen(),
-                true
-        );
-        delegationStore.put(id, record);
-        return mapDelegation(record);
+        UyQuyen saved = uyQuyenRepository.save(UyQuyen.builder()
+                .nguoiUyQuyenId(request.nguoiUyQuyenId())
+                .nguoiDuocUyQuyenId(request.nguoiDuocUyQuyenId())
+                .tuNgay(request.tuNgay())
+                .denNgay(request.denNgay())
+                .phamViUyQuyen(request.phamViUyQuyen())
+                .ghiChu(request.ghiChu())
+                .active(true)
+                .build());
+        return mapDelegation(saved);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponse<DelegationResponse> getDelegations(Long nguoiUyQuyenId, Long nguoiDuocUyQuyenId, Boolean active, Pageable pageable) {
-        List<DelegationResponse> filtered = delegationStore.values().stream()
-                .filter(item -> nguoiUyQuyenId == null || item.nguoiUyQuyenId().equals(nguoiUyQuyenId))
-                .filter(item -> nguoiDuocUyQuyenId == null || item.nguoiDuocUyQuyenId().equals(nguoiDuocUyQuyenId))
+        LocalDate today = LocalDate.now();
+        List<DelegationResponse> filtered = uyQuyenRepository.findAll().stream()
+                .filter(item -> nguoiUyQuyenId == null || item.getNguoiUyQuyenId().equals(nguoiUyQuyenId))
+                .filter(item -> nguoiDuocUyQuyenId == null || item.getNguoiDuocUyQuyenId().equals(nguoiDuocUyQuyenId))
                 .filter(item -> {
-                    if (active == null) {
-                        return true;
-                    }
-                    boolean isActive = item.active() && !LocalDate.now().isBefore(item.tuNgay()) && !LocalDate.now().isAfter(item.denNgay());
+                    if (active == null) return true;
+                    boolean isActive = Boolean.TRUE.equals(item.getActive())
+                            && !today.isBefore(item.getTuNgay())
+                            && !today.isAfter(item.getDenNgay());
                     return active.equals(isActive);
                 })
-                .sorted(Comparator.comparing(DelegationRecord::id))
+                .sorted(Comparator.comparing(UyQuyen::getId))
                 .map(this::mapDelegation)
                 .toList();
         return toPage(filtered, pageable);
     }
 
     @Override
+    @Transactional
     public IdResponse cancelDelegation(Long id) {
-        if (delegationStore.remove(id) == null) {
-            throw new ApiException(ErrorCode.INVALID_REQUEST, HttpStatus.NOT_FOUND, "Delegation not found");
-        }
+        UyQuyen delegation = uyQuyenRepository.findById(id)
+                .orElseThrow(() -> new ApiException(ErrorCode.INVALID_REQUEST, HttpStatus.NOT_FOUND, "Delegation not found"));
+        delegation.setActive(false);
+        uyQuyenRepository.save(delegation);
         return new IdResponse(id);
     }
 
@@ -650,15 +650,19 @@ public class WorkflowApiServiceImpl implements WorkflowApiService {
         );
     }
 
-    private DelegationResponse mapDelegation(DelegationRecord record) {
+    private DelegationResponse mapDelegation(UyQuyen entity) {
+        LocalDate today = LocalDate.now();
+        boolean isActive = Boolean.TRUE.equals(entity.getActive())
+                && !today.isBefore(entity.getTuNgay())
+                && !today.isAfter(entity.getDenNgay());
         return new DelegationResponse(
-                record.id(),
-                record.nguoiUyQuyenId(),
-                record.nguoiDuocUyQuyenId(),
-                record.tuNgay(),
-                record.denNgay(),
-                record.phamViUyQuyen(),
-                record.active()
+                entity.getId(),
+                entity.getNguoiUyQuyenId(),
+                entity.getNguoiDuocUyQuyenId(),
+                entity.getTuNgay(),
+                entity.getDenNgay(),
+                entity.getPhamViUyQuyen(),
+                isActive
         );
     }
 
@@ -739,14 +743,4 @@ public class WorkflowApiServiceImpl implements WorkflowApiService {
         }
     }
 
-    private record DelegationRecord(
-            Long id,
-            Long nguoiUyQuyenId,
-            Long nguoiDuocUyQuyenId,
-            LocalDate tuNgay,
-            LocalDate denNgay,
-            String phamViUyQuyen,
-            Boolean active
-    ) {
-    }
 }

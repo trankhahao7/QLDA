@@ -77,6 +77,15 @@ public class VanBan {
     @Column(name = "DaOCR")
     private Boolean daOCR;
 
+    @Column(name = "NoiDungOCR", columnDefinition = "TEXT")
+    private String noiDungOCR;
+
+    @Column(name = "AiPhanLoai", length = 100)
+    private String aiPhanLoai;
+
+    @Column(name = "AiConfidence")
+    private Double aiConfidence;
+
     @Column(name = "DaKySo")
     private Boolean daKySo;
 

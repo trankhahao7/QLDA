@@ -40,6 +40,8 @@ export type DocumentDetail = {
   trangThai?: number;
   daOCR?: boolean;
   daKySo?: boolean;
+  aiPhanLoai?: string | null;
+  aiConfidence?: number | null;
   attachments?: AttachmentItem[];
 };
 

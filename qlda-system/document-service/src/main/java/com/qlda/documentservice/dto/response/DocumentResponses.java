@@ -65,6 +65,8 @@ public final class DocumentResponses {
         Integer trangThai,
         Boolean daOCR,
         Boolean daKySo,
+        String aiPhanLoai,
+        Double aiConfidence,
         List<AttachmentResponse> attachments
     ) {
     }

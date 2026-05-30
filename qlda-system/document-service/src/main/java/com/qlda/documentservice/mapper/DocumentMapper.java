@@ -75,6 +75,8 @@ public class DocumentMapper {
             vanBan.getTrangThai(),
             vanBan.getDaOCR(),
             vanBan.getDaKySo(),
+            vanBan.getAiPhanLoai(),
+            vanBan.getAiConfidence(),
             mappedAttachments
         );
     }

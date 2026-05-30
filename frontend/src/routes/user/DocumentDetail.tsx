@@ -217,6 +217,20 @@ export default function DocumentDetail() {
                       Đã ký số
                     </button>
                   )}
+                  {doc.aiPhanLoai && (
+                    <span
+                      className="badge badge--info"
+                      title={doc.aiConfidence != null ? `Độ tin cậy: ${Math.round(doc.aiConfidence * 100)}%` : "AI gợi ý phân loại"}
+                      style={{ cursor: "default" }}
+                    >
+                      AI: {doc.aiPhanLoai}
+                      {doc.aiConfidence != null && (
+                        <span style={{ marginLeft: 4, opacity: 0.75, fontSize: 11 }}>
+                          ({Math.round(doc.aiConfidence * 100)}%)
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {oneDriveUrl && (
                     <a
                       href={oneDriveUrl}
