@@ -162,10 +162,7 @@ export default function Reports() {
   return (
     <section>
       <div className="topbar">
-        <div className="topbar__title">
-          <h1>Báo cáo & Thống kê</h1>
-          <p>Tổng hợp tình hình xử lý văn bản theo thời gian.</p>
-        </div>
+        <div />
         <div className="topbar__actions">
           <button className="button secondary" type="button" onClick={exportCsv} disabled={!stats}>
             Xuất CSV

@@ -136,7 +136,7 @@ export default function DocumentTypeManagement() {
         >
           + Thêm loại văn bản
         </button>
-      </span></div>
+      </div>
 
       <div className="admin-filters">
         <input
@@ -146,7 +146,7 @@ export default function DocumentTypeManagement() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
-      </span></div>
+      </div>
 
       {showForm && (
         <div className="admin-form-modal">
@@ -172,7 +172,7 @@ export default function DocumentTypeManagement() {
                   placeholder="VD: CT, TB, QD..."
                   className="form-input"
                 />
-              </span></div>
+              </div>
               <div className="form-group">
                 <label>Tên loại văn bản *</label>
                 <input
@@ -184,7 +184,7 @@ export default function DocumentTypeManagement() {
                   placeholder="VD: Công văn, Thông báo..."
                   className="form-input"
                 />
-              </span></div>
+              </div>
               <div className="form-group">
                 <label>Mô tả</label>
                 <textarea
@@ -196,7 +196,7 @@ export default function DocumentTypeManagement() {
                   rows={4}
                   className="form-input"
                 ></textarea>
-              </span></div>
+              </div>
               <div className="form-group checkbox">
                 <input
                   type="checkbox"
@@ -207,7 +207,7 @@ export default function DocumentTypeManagement() {
                   }
                 />
                 <label htmlFor="suDung">Sử dụng</label>
-              </span></div>
+              </div>
               <div className="form-actions">
                 <button
                   type="button"
@@ -223,10 +223,10 @@ export default function DocumentTypeManagement() {
                 >
                   Hủy
                 </button>
-              </span></div>
+              </div>
             </form>
-          </span></div>
-        </span></div>
+          </div>
+        </div>
       )}
 
       <table className="admin-table">
@@ -277,7 +277,7 @@ export default function DocumentTypeManagement() {
 
       <div className="pagination">
         <p>Tổng: {filteredTypes.length} loại văn bản</p>
-      </span></div>
-    </span></div>
+      </div>
+    </div>
   );
 }

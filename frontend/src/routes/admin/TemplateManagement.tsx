@@ -213,7 +213,7 @@ export default function TemplateManagement() {
         >
           + Thêm template
         </button>
-      </span></div>
+      </div>
 
       <div className="admin-filters">
         <input
@@ -264,7 +264,7 @@ export default function TemplateManagement() {
                     placeholder="VD: TMP001"
                     className="form-input"
                   />
-                </span></div>
+                </div>
                 <div className="form-group">
                   <label>Tên template *</label>
                   <input
@@ -279,8 +279,8 @@ export default function TemplateManagement() {
                     placeholder="Tên template"
                     className="form-input"
                   />
-                </span></div>
-              </span></div>
+                </div>
+              </div>
               <div className="form-group">
                 <label>Loại văn bản</label>
                 <select
@@ -300,7 +300,7 @@ export default function TemplateManagement() {
                     </option>
                   ))}
                 </select>
-              </span></div>
+              </div>
               <div className="form-group">
                 <label>Nội dung mẫu</label>
                 <textarea
@@ -315,7 +315,7 @@ export default function TemplateManagement() {
                   rows={6}
                   className="form-input"
                 ></textarea>
-              </span></div>
+              </div>
               <div className="form-group">
                 <label>Tệp mẫu (URL hoặc tên file)</label>
                 <input
@@ -327,7 +327,7 @@ export default function TemplateManagement() {
                   placeholder="/templates/template.docx"
                   className="form-input"
                 />
-              </span></div>
+              </div>
               <div className="form-group checkbox">
                 <input
                   type="checkbox"
@@ -338,7 +338,7 @@ export default function TemplateManagement() {
                   }
                 />
                 <label htmlFor="suDung">Sử dụng</label>
-              </span></div>
+              </div>
               <div className="form-actions">
                 <button
                   type="button"
@@ -354,10 +354,10 @@ export default function TemplateManagement() {
                 >
                   Hủy
                 </button>
-              </span></div>
+              </div>
             </form>
-          </span></div>
-        </span></div>
+          </div>
+        </div>
       )}
 
       <div className="templates-grid">
@@ -372,7 +372,7 @@ export default function TemplateManagement() {
               >
                 {template.suDung ? "Sử dụng" : "Không sử dụng"}
               </span>
-            </span></div>
+            </div>
             <div className="template-body">
               <p className="template-code">
                 Mã: <span className="code-badge">{template.maTemplate}</span>
@@ -385,8 +385,8 @@ export default function TemplateManagement() {
                 <p className="preview-text">
                   {(template.noiDungMau || "").substring(0, 100)}...
                 </p>
-              </span></div>
-            </span></div>
+              </div>
+            </div>
             <div className="template-actions">
               <button className="button small" onClick={() => handleDownloadTemplate(template)}>
                 📥 Tải xuống
@@ -412,13 +412,13 @@ export default function TemplateManagement() {
               <button className="button small" onClick={() => handleEditTemplate(template)}>Sửa</button>
               <button className="button small danger" onClick={() => handleDeleteTemplate(template.id)}>Xóa</button>
             </div>
-          </span></div>
+          </div>
         ))}
-      </span></div>
+      </div>
 
       <div className="pagination">
         <p>Tổng: {filteredTemplates.length} template</p>
-      </span></div>
-    </span></div>
+      </div>
+    </div>
   );
 }

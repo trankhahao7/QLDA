@@ -116,12 +116,7 @@ export default function SlaManagement() {
 
   return (
     <section>
-      <div className="topbar">
-        <div className="topbar__title">
-          <h1>Quản lý SLA</h1>
-          <p>Cấu hình thời gian xử lý và theo dõi vi phạm SLA.</p>
-        </div>
-      </div>
+      <div className="topbar" />
 
       <div className="filter-bar" style={{ marginBottom: 16 }}>
         <div className="filter-tabs">

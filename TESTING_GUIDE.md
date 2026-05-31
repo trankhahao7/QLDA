@@ -1,1065 +1,583 @@
-# Hướng Dẫn Test Toàn Diện — Hệ Thống QLDA
+# Hướng Dẫn Demo & Test Giao Diện — Hệ Thống QLDA
 
-> **Ngày viết:** 2026-05-31  
-> **Môi trường:** localhost (Docker + Vite dev server)  
-> **Tác giả:** icetruong
-
----
-
-## Mục Lục
-
-1. [Điều kiện tiên quyết](#1-điều-kiện-tiên-quyết)
-2. [Kiểm tra hệ thống đang chạy](#2-kiểm-tra-hệ-thống-đang-chạy)
-3. [Tài khoản test](#3-tài-khoản-test)
-4. [Phase A — Authentication (Đăng nhập)](#4-phase-a--authentication)
-5. [Phase B — Văn bản đến (Inbox)](#5-phase-b--văn-bản-đến)
-6. [Phase C — Văn bản đi](#6-phase-c--văn-bản-đi)
-7. [Phase D — Quy trình phê duyệt (Approvals)](#7-phase-d--quy-trình-phê-duyệt)
-8. [Phase E — Hồ sơ (CaseFiles)](#8-phase-e--hồ-sơ)
-9. [Phase F — Thông báo (Notifications)](#9-phase-f--thông-báo)
-10. [Phase G — Ủy quyền (Delegation)](#10-phase-g--ủy-quyền)
-11. [Phase H — Tìm kiếm (Search)](#11-phase-h--tìm-kiếm)
-12. [Phase I — AI Chatbot](#12-phase-i--ai-chatbot)
-13. [Phase J — Quản trị Admin](#13-phase-j--quản-trị-admin)
-14. [Phase K — Báo cáo & Thống kê](#14-phase-k--báo-cáo--thống-kê)
-15. [Phase L — Audit Log](#15-phase-l--audit-log)
-16. [Phase M — API trực tiếp (curl / Postman)](#16-phase-m--api-trực-tiếp)
-17. [Kịch bản End-to-End hoàn chỉnh](#17-kịch-bản-end-to-end-hoàn-chỉnh)
-18. [Checklist tổng kết](#18-checklist-tổng-kết)
+> **Mục tiêu:** Test toàn bộ chức năng qua giao diện người dùng (UI), không cần curl hay Postman.  
+> **Thời gian ước tính:** 45–60 phút cho toàn bộ luồng.
 
 ---
 
-## 1. Điều Kiện Tiên Quyết
+## Tài Khoản Cần Dùng
 
-### 1.1 Dịch vụ phải đang chạy
+Hệ thống dùng **đăng nhập Azure SSO** (tài khoản DUT). Cần **2 tài khoản** đăng nhập song song trên 2 trình duyệt khác nhau:
 
-```powershell
-docker --context desktop-linux compose -f qlda-system/docker-compose.yml ps
+| # | Email đăng nhập | Vai trò trong hệ thống | Dùng để test |
+|---|---|---|---|
+| **TK1** | `102230222@sv1.dut.udn.vn` | Chuyên viên (USER) | Tạo văn bản, upload, tìm kiếm, ủy quyền |
+| **TK2** | `102230238@sv1.dut.udn.vn` | Quản trị viên (ADMIN) | Phê duyệt, quản trị hệ thống, báo cáo |
+
+> **Mật khẩu**: dùng mật khẩu DUT của từng tài khoản tương ứng.  
+> **Cách mở 2 trình duyệt cùng lúc**: mở Chrome bình thường (TK2-Admin) + mở cửa sổ **Ẩn danh / Incognito** (TK1-User), hoặc dùng Chrome + Firefox.
+
+---
+
+## Điều Kiện Tiên Quyết
+
+Trước khi bắt đầu, đảm bảo:
+
+1. **Docker đang chạy** — mở Docker Desktop, kiểm tra tất cả container `qlda-*` đều **Running**
+2. **Frontend đang chạy** — mở terminal, chạy `cd frontend && npm run dev`, truy cập `http://localhost:5173`
+3. **Kiểm tra nhanh**: mở `http://localhost:8761` — phải thấy 5 service đã đăng ký (auth, document, workflow, ai, notification)
+
+---
+
+## Sơ Đồ Luồng Test
+
 ```
-
-Tất cả 10 container phải ở trạng thái **Up**:
-
-| Container | Port | Vai trò |
-|---|---|---|
-| qlda-postgres | 5432 | PostgreSQL + pgvector |
-| qlda-zookeeper | 2181 | Kafka coordinator |
-| qlda-kafka | 9092, 29092 | Message broker |
-| qlda-eureka-server | 8761 | Service discovery |
-| qlda-auth-service | 8081 | Xác thực, người dùng |
-| qlda-document-service | 8082 | Văn bản, file đính kèm |
-| qlda-workflow-service | 8083 | Quy trình, phê duyệt |
-| qlda-ai-service | 8084 | Tóm tắt, phân loại AI |
-| qlda-notification-service | 8085 | Thông báo, báo cáo |
-| qlda-api-gateway | 8080 | Entry point toàn hệ thống |
-
-### 1.2 Frontend
-
-```powershell
-cd frontend && npm run dev
-```
-
-Frontend: **http://localhost:5173**
-
-### 1.3 Khởi động lại nếu cần
-
-```powershell
-# Khởi động toàn bộ
-docker --context desktop-linux compose -f qlda-system/docker-compose.yml up -d
-
-# Rebuild một service cụ thể (ví dụ auth-service)
-docker --context desktop-linux compose -f qlda-system/docker-compose.yml up -d --build auth-service
+[TK1 - Chuyên viên]          [TK2 - Admin]
+       │                            │
+  Đăng nhập                    Đăng nhập
+       │                            │
+  Tạo văn bản đến ──────────> Xem & phê duyệt
+       │                            │
+  Tạo văn bản đi ───────────> Quản trị hệ thống
+       │                            │
+  Tìm kiếm / AI chatbot        Xem báo cáo
+       │                            │
+  Ủy quyền                    Audit log
 ```
 
 ---
 
-## 2. Kiểm Tra Hệ Thống Đang Chạy
+## PHẦN 1 — ĐĂNG NHẬP
 
-Chạy các lệnh sau trước khi test bất cứ thứ gì:
+### Bước 1.1 — Đăng nhập TK2 (Admin) — Trình duyệt chính
 
-### 2.1 Eureka Dashboard
+1. Mở Chrome, vào `http://localhost:5173`
+2. Trang hiển thị màn hình đăng nhập với nút **"Đăng nhập với Microsoft"**
+3. Click nút đó
+4. Trình duyệt chuyển sang trang Microsoft → đăng nhập bằng `102230238@sv1.dut.udn.vn`
+5. Nếu lần đầu: bấm **Chấp nhận / Accept** ở màn hình xin quyền
+6. ✅ **Kết quả**: chuyển vào trang Dashboard, sidebar hiển thị tên "Administrator"
 
-Mở: **http://localhost:8761**
+### Bước 1.2 — Đăng nhập TK1 (Chuyên viên) — Incognito
 
-Kiểm tra 5 service đã đăng ký: `auth-service`, `document-service`, `workflow-service`, `ai-service`, `notification-service`.
+1. Mở cửa sổ **Ẩn danh** (Ctrl+Shift+N), vào `http://localhost:5173`
+2. Lặp lại quy trình như 1.1 nhưng dùng tài khoản `102230222@sv1.dut.udn.vn`
+3. ✅ **Kết quả**: vào Dashboard, sidebar hiển thị tên "Phan Van Truong"
 
-### 2.2 Health check nhanh qua API Gateway
-
-```bash
-# Auth service
-curl http://localhost:8080/api/auth/office365/config/status
-
-# Kỳ vọng: {"success":true,"data":{"tenantId":"42350984...","clientId":"d6dac1af...","configured":true}}
-```
-
-```bash
-# AI Chatbot (public endpoint)
-curl -X POST http://localhost:8080/api/ai/chatbot/ask \
-  -H "Content-Type: application/json" \
-  -d '{"message":"xin chào","sessionId":"test-001"}'
-
-# Kỳ vọng: {"reply":"...","success":true}
-```
-
-### 2.3 Kiểm tra logs nếu có lỗi
-
-```powershell
-docker --context desktop-linux logs qlda-auth-service --tail 30
-docker --context desktop-linux logs qlda-api-gateway --tail 30
-```
+> Từ đây: **"Cửa sổ thường" = Admin (TK2)**, **"Cửa sổ ẩn danh" = Chuyên viên (TK1)**
 
 ---
 
-## 3. Tài Khoản Test
+## PHẦN 2 — DASHBOARD
 
-Các tài khoản có sẵn trong DB (từ `qlda_seed.sql`):
+### Bước 2.1 — Xem Dashboard (TK1 - Chuyên viên)
 
-| username | Họ tên | Email | Vai trò | Ghi chú |
-|---|---|---|---|---|
-| `admin` | Administrator | 102230238@sv1.dut.udn.vn | ADMIN (ID: 1) | Toàn quyền |
-| `nguyenvana` | Trần Khả Hào | trankhahao7@gmail.com | USER (ID: 2) | Chuyên viên |
-| `truongdv` | Trương ĐV | truongdv@coquan.gov.vn | MANAGER (ID: 3) | Trưởng phòng |
-| `icetruong` | Phan Van Truong | 102230222@sv1.dut.udn.vn | USER (ID: 2) | Azure AD chính |
+*Thực hiện tại: Cửa sổ ẩn danh*
 
-> **Dev login** (không cần Azure): dùng `POST /api/auth/login/dev` với `{"username":"admin"}` để lấy token nhanh.
+1. Sau khi đăng nhập, đang ở trang `/dashboard`
+2. Quan sát các thẻ thống kê: Văn bản đến, Văn bản đi, Chờ phê duyệt, Thông báo
+3. ✅ **Kết quả**: các số liệu hiển thị (có thể là 0 nếu chưa có dữ liệu), không bị lỗi trang
 
----
+### Bước 2.2 — Xem Dashboard Admin (TK2 - Admin)
 
-## 4. Phase A — Authentication
+*Thực hiện tại: Cửa sổ thường*
 
-### A1. Đăng nhập Azure SSO (luồng chính)
-
-1. Mở **http://localhost:5173**
-2. Click **"Đăng nhập với Microsoft"**
-3. Trình duyệt redirect sang `https://login.microsoftonline.com/42350984.../oauth2/v2.0/authorize`
-4. Đăng nhập bằng tài khoản `102230222@sv1.dut.udn.vn` (hoặc `102230238@sv1.dut.udn.vn`)
-5. Nếu lần đầu: màn hình consent hiện lên → click **Accept**
-6. Trình duyệt redirect về `http://localhost:5173/auth/callback?code=...&state=...`
-7. Frontend tự động gọi `POST /api/auth/login/azure`
-8. ✅ **Kỳ vọng**: redirect sang `/dashboard`, hiện tên người dùng ở sidebar
-
-**Kiểm tra sau đăng nhập:**
-- Mở DevTools → Application → LocalStorage → kiểm tra key `access_token` tồn tại
-- Tên user hiển thị đúng ở sidebar
-
-### A2. Dev Login (không cần Azure)
-
-```bash
-curl -X POST http://localhost:8080/api/auth/login/dev \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin"}'
-```
-
-✅ **Kỳ vọng:** trả về `{"success":true,"data":{"accessToken":"eyJ...","refreshToken":"..."}}`
-
-### A3. Refresh Token
-
-```bash
-# Lấy refreshToken từ bước A2, thay vào dưới đây
-curl -X POST http://localhost:8080/api/auth/refresh-token \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refreshToken từ A2>"}'
-```
-
-✅ **Kỳ vọng:** trả về accessToken mới
-
-### A4. Logout
-
-1. Trên UI: click avatar → Đăng xuất
-2. ✅ **Kỳ vọng**: redirect về `/login`, token bị xóa khỏi localStorage
-
-### A5. Bảo mật — Truy cập không có token
-
-```bash
-curl http://localhost:8080/api/documents/incoming
-# Kỳ vọng: 401 Unauthorized
-```
-
-```bash
-curl http://localhost:8080/api/auth/users
-# Kỳ vọng: 401 Unauthorized (không có token)
-```
+1. Ở sidebar, click **"Quản trị"** → **"Bảng điều khiển"** (hoặc vào `/admin/dashboard`)
+2. ✅ **Kết quả**: trang Admin Dashboard với thống kê tổng quan hệ thống
 
 ---
 
-## 5. Phase B — Văn Bản Đến
+## PHẦN 3 — VĂN BẢN ĐẾN
 
-> Trước khi test, lấy token Admin: xem bước A2 → lưu `$TOKEN`
+*Toàn bộ phần này thực hiện tại **Cửa sổ ẩn danh (TK1 - Chuyên viên)***
 
-### B1. Danh sách văn bản đến (UI)
+### Bước 3.1 — Xem danh sách văn bản đến
 
-1. Đăng nhập với tài khoản bất kỳ
-2. Click **"Văn bản đến"** ở sidebar (route `/inbox`)
-3. ✅ **Kỳ vọng**: danh sách hiển thị, có 2 văn bản mẫu (VB-001, VB-002) từ seed
+1. Click **"Văn bản đến"** ở sidebar → vào `/inbox`
+2. ✅ **Kết quả**: trang tải được, hiển thị bảng danh sách văn bản (có thể có văn bản mẫu từ hệ thống)
 
-### B2. Xem chi tiết văn bản
+### Bước 3.2 — Xem chi tiết một văn bản
 
-1. Click vào VB-001
-2. ✅ **Kỳ vọng**: trang `/documents/5001` load đúng, hiển thị: số ký hiệu, trích yếu, đơn vị, ngày
+1. Ở trang `/inbox`, click vào một dòng văn bản bất kỳ (nếu có)
+2. ✅ **Kết quả**: trang chi tiết văn bản (`/documents/:id`) hiển thị đầy đủ thông tin: số ký hiệu, trích yếu, ngày tiếp nhận, trạng thái, file đính kèm
 
-### B3. Tạo văn bản đến mới (API)
+### Bước 3.3 — Chuyển xử lý văn bản
 
-```bash
-TOKEN="<access_token từ A2>"
-
-curl -X POST http://localhost:8080/api/documents/incoming \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "soKyHieu": "TEST-001",
-    "trichYeu": "Văn bản test đến",
-    "loaiVanBanId": 1,
-    "donViChuTriId": 1,
-    "ngayVanBan": "2026-05-01",
-    "ngayTiepNhan": "2026-05-02",
-    "doMat": "Bình thường",
-    "doKhan": "Trung bình",
-    "hanXuLy": "2026-06-01"
-  }'
-```
-
-✅ **Kỳ vọng:** `{"success":true,"data":{"id":...,"soKyHieu":"TEST-001"}}`
-
-### B4. Upload file đính kèm
-
-```bash
-# Tạo file test
-echo "Nội dung test" > test.txt
-
-curl -X POST http://localhost:8080/api/documents/5001/attachments \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "file=@test.txt"
-```
-
-✅ **Kỳ vọng:** trả về `attachmentId`, `tenTep`
-
-### B5. Chuyển xử lý (Transfer)
-
-```bash
-curl -X POST http://localhost:8080/api/documents/incoming/5001/transfer \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nguoiNhanId": 1002,
-    "donViNhanId": 1,
-    "ghiChu": "Chuyển để xử lý",
-    "hanXuLy": "2026-06-15"
-  }'
-```
-
-✅ **Kỳ vọng:** `{"success":true,"data":{"documentId":5001,...}}`
-
-### B6. Upload trang (UI)
-
-1. Vào `/upload`
-2. Kéo thả file PDF/DOC vào vùng upload
-3. ✅ **Kỳ vọng**: file được upload, hiện thông báo thành công
+1. Quay lại `/inbox`
+2. Ở dòng một văn bản, click nút **"Chuyển xử lý"** (hoặc chọn checkbox → action "Chuyển")
+3. Form chuyển xử lý hiện ra: điền người nhận, đơn vị, nội dung, hạn xử lý
+4. Click **"Xác nhận chuyển"**
+5. ✅ **Kết quả**: thông báo thành công, trạng thái văn bản đổi thành "Đã chuyển xử lý"
 
 ---
 
-## 6. Phase C — Văn Bản Đi
+## PHẦN 4 — UPLOAD VĂN BẢN
 
-### C1. Danh sách văn bản đi (UI)
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
 
-1. Click **"Văn bản đi"** ở sidebar (route `/outgoing`)
-2. ✅ **Kỳ vọng**: trang load, hiển thị bảng (có thể empty ban đầu)
+### Bước 4.1 — Upload văn bản mới
 
-### C2. Tạo văn bản đi
-
-```bash
-curl -X POST http://localhost:8080/api/documents/outgoing \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "soKyHieu": "OUT-TEST-001",
-    "trichYeu": "Văn bản đi test phân bổ ngân sách",
-    "loaiVanBanId": 1,
-    "donViChuTriId": 1,
-    "ngayVanBan": "2026-05-31",
-    "doMat": "Bình thường",
-    "doKhan": "Cao",
-    "hanXuLy": "2026-06-30",
-    "nguoiKy": "Trưởng phòng"
-  }'
-```
-
-✅ **Kỳ vọng:** `{"success":true,"data":{"id":...}}`
-
-### C3. Cập nhật văn bản đi
-
-```bash
-DOC_ID=<id từ C2>
-
-curl -X PUT http://localhost:8080/api/documents/outgoing/$DOC_ID \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "soKyHieu": "OUT-TEST-001-REV",
-    "trichYeu": "Văn bản đi test (đã cập nhật)",
-    "loaiVanBanId": 1,
-    "donViChuTriId": 1,
-    "ngayVanBan": "2026-05-31",
-    "doMat": "Bình thường",
-    "doKhan": "Cao"
-  }'
-```
-
-### C4. Submit phê duyệt
-
-```bash
-curl -X POST http://localhost:8080/api/documents/outgoing/$DOC_ID/submit-approval \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "quyTrinhId": 1,
-    "ghiChu": "Trình phê duyệt"
-  }'
-```
-
-✅ **Kỳ vọng:** `{"success":true,"data":{"documentId":...,"workflowStatus":"PENDING"}}`
-
-### C5. Tạo nháp (Draft)
-
-```bash
-curl -X POST http://localhost:8080/api/documents/drafts \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "trichYeu": "Nháp công văn phân bổ",
-    "loaiVanBanId": 1,
-    "noidung": "Nội dung nháp..."
-  }'
-```
+1. Click **"Upload"** ở sidebar → vào `/upload`
+2. Trang hiển thị vùng kéo thả file
+3. Kéo thả một file **PDF hoặc DOCX** vào vùng upload (hoặc click để chọn file)
+4. Điền các thông tin: Số ký hiệu (ví dụ: `VB-TEST-001`), Trích yếu, Loại văn bản, Đơn vị ban hành, Ngày văn bản
+5. Click **"Upload"** hoặc **"Lưu"**
+6. ✅ **Kết quả**: file upload thành công, hiển thị thông báo, văn bản xuất hiện ở danh sách `/inbox`
 
 ---
 
-## 7. Phase D — Quy Trình Phê Duyệt
+## PHẦN 5 — VĂN BẢN ĐI
 
-### D1. Xem danh sách chờ duyệt (UI)
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
 
-1. Đăng nhập tài khoản `truongdv` (MANAGER) hoặc `admin`
-2. Click **"Phê duyệt"** ở sidebar (route `/approvals`)
-3. ✅ **Kỳ vọng**: danh sách "Chờ duyệt" hiện (nếu đã submit ở C4)
+### Bước 5.1 — Xem danh sách văn bản đi
 
-### D2. Lấy danh sách pending (API)
+1. Click **"Văn bản đi"** ở sidebar → vào `/outgoing`
+2. ✅ **Kết quả**: trang tải được, hiển thị bảng văn bản đi
 
-```bash
-curl "http://localhost:8080/api/workflows/approvals/pending?nguoiDuyetId=1001" \
-  -H "Authorization: Bearer $TOKEN"
-```
+### Bước 5.2 — Tạo văn bản đi mới
 
-✅ **Kỳ vọng:** danh sách các approval đang chờ
+1. Click nút **"+ Tạo văn bản đi"** (hoặc tương tự)
+2. Điền form:
+   - Số ký hiệu: `CV-TEST-001`
+   - Trích yếu: `Công văn test về phân bổ kinh phí`
+   - Loại văn bản: chọn từ dropdown
+   - Đơn vị chủ trì: chọn từ dropdown
+   - Ngày văn bản: chọn ngày hôm nay
+   - Độ khẩn: Bình thường
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: văn bản được tạo, xuất hiện trong danh sách với trạng thái "Nháp"
 
-### D3. Phê duyệt — Đồng ý
+### Bước 5.3 — Submit văn bản đi để phê duyệt
 
-```bash
-PROCESSING_ID=<lấy từ D2>
+1. Ở dòng văn bản vừa tạo (CV-TEST-001), click **"Trình duyệt"** hoặc **"Submit phê duyệt"**
+2. Chọn quy trình phê duyệt (nếu có dropdown)
+3. Điền ghi chú: `Trình phê duyệt công văn test`
+4. Click **"Xác nhận"**
+5. ✅ **Kết quả**: trạng thái đổi sang "Chờ phê duyệt" hoặc "Trình ký"
 
-curl -X POST "http://localhost:8080/api/workflows/approvals/$PROCESSING_ID/approve" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ghiChu": "Đồng ý phê duyệt",
-    "nguoiDuyetId": 1001
-  }'
-```
-
-✅ **Kỳ vọng:** `{"success":true,"data":{"action":"APPROVED",...}}`
-
-### D4. Phê duyệt — Từ chối
-
-```bash
-curl -X POST "http://localhost:8080/api/workflows/approvals/$PROCESSING_ID/reject" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ghiChu": "Từ chối do thiếu tài liệu",
-    "nguoiDuyetId": 1001
-  }'
-```
-
-### D5. Thêm comment
-
-```bash
-curl -X POST "http://localhost:8080/api/workflows/approvals/$PROCESSING_ID/comment" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ghiChu": "Cần bổ sung thêm thông tin",
-    "nguoiDuyetId": 1001
-  }'
-```
-
-### D6. Timeline theo dõi
-
-```bash
-DOC_ID=5001
-
-curl "http://localhost:8080/api/workflows/documents/$DOC_ID/timeline" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-✅ **Kỳ vọng:** mảng các bước đã qua, thời gian, người thực hiện
+> Sau bước này, chuyển sang cửa sổ thường (Admin) để thực hiện phê duyệt ở Phần 6.
 
 ---
 
-## 8. Phase E — Hồ Sơ
+## PHẦN 6 — PHÊ DUYỆT (APPROVALS)
 
-### E1. Xem danh sách hồ sơ (UI)
+### Bước 6.1 — Xem danh sách chờ phê duyệt (TK2 - Admin)
 
-1. Click **"Hồ sơ"** ở sidebar (route `/case-files`)
-2. ✅ **Kỳ vọng**: trang load, hiển thị danh sách
+*Thực hiện tại **Cửa sổ thường (TK2)***
 
-### E2. API lấy hồ sơ
+1. Click **"Phê duyệt"** ở sidebar → vào `/approvals`
+2. ✅ **Kết quả**: danh sách các văn bản đang chờ phê duyệt hiển thị, trong đó có CV-TEST-001
 
-```bash
-curl "http://localhost:8080/api/documents/case-files" \
-  -H "Authorization: Bearer $TOKEN"
-```
+### Bước 6.2 — Phê duyệt — Đồng ý
 
-### E3. Tạo hồ sơ
+1. Ở dòng CV-TEST-001, click **"Phê duyệt"** (nút màu xanh ✅)
+2. Modal hiện ra với tiêu đề "Phê duyệt văn bản"
+3. Điền ghi chú: `Đồng ý phê duyệt, nội dung hợp lệ`
+4. Click **"Xác nhận phê duyệt"**
+5. ✅ **Kết quả**: trạng thái văn bản đổi sang "Đã duyệt", dòng đó biến khỏi danh sách chờ
 
-```bash
-curl -X POST http://localhost:8080/api/documents/case-files \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "maHoSo": "HS-2026-001",
-    "tenHoSo": "Hồ sơ dự án A",
-    "namLuu": 2026,
-    "donViId": 1,
-    "ghiChu": "Hồ sơ thử nghiệm"
-  }'
-```
+### Bước 6.3 — Từ chối phê duyệt (test thêm)
 
----
+1. Tạo một văn bản đi khác (lặp lại 5.2–5.3)
+2. Ở màn Approvals, click **"Từ chối"** (nút đỏ 🚫)
+3. Điền lý do: `Thiếu tài liệu kèm theo`
+4. Click **"Xác nhận từ chối"**
+5. ✅ **Kết quả**: trạng thái văn bản đổi sang "Từ chối"
 
-## 9. Phase F — Thông Báo
+### Bước 6.4 — Ghi chú / Yêu cầu bổ sung
 
-### F1. Xem thông báo (UI)
-
-1. Click chuông 🔔 ở topbar hoặc vào `/notifications`
-2. ✅ **Kỳ vọng**: danh sách thông báo (in-app)
-
-### F2. Lấy thông báo (API)
-
-```bash
-curl "http://localhost:8080/api/notifications?nguoiNhanId=1001&page=0&size=10" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### F3. Đánh dấu đã đọc
-
-```bash
-NOTIF_ID=<id từ F2>
-
-curl -X PATCH "http://localhost:8080/api/notifications/$NOTIF_ID/read" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"nguoiNhanId": 1001}'
-```
-
-### F4. Tạo thông báo thủ công (API)
-
-```bash
-curl -X POST http://localhost:8080/api/notifications \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nguoiNhanId": 1002,
-    "tieuDe": "Thông báo test",
-    "noiDung": "Nội dung test notification",
-    "loaiThongBao": "HE_THONG",
-    "vanBanId": 5001
-  }'
-```
-
-### F5. Gửi qua Teams Webhook (test thực tế)
-
-```bash
-NOTIF_ID=<id từ F4>
-
-curl -X POST "http://localhost:8080/api/notifications/$NOTIF_ID/send" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"channel": "TEAMS"}'
-```
-
-✅ **Kỳ vọng:** tin nhắn xuất hiện trong Teams channel đã cấu hình Incoming Webhook
-
-### F6. Gửi qua Email (SMTP)
-
-```bash
-curl -X POST "http://localhost:8080/api/notifications/$NOTIF_ID/send" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"channel": "EMAIL"}'
-```
-
-✅ **Kỳ vọng:** email gửi tới địa chỉ của `nguoiNhanId=1002` (trankhahao7@gmail.com)
+1. Ở danh sách phê duyệt, click **"Ghi chú"** (nút 💬)
+2. Điền: `Cần bổ sung thêm phụ lục kèm theo`
+3. Click **"Gửi ghi chú"**
+4. ✅ **Kết quả**: ghi chú được ghi lại, văn bản vẫn ở trạng thái chờ
 
 ---
 
-## 10. Phase G — Ủy Quyền
+## PHẦN 7 — HỒ SƠ (CASE FILES)
 
-### G1. Tạo ủy quyền (UI)
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
 
-1. Vào `/delegation`
+### Bước 7.1 — Xem danh sách hồ sơ
+
+1. Click **"Hồ sơ"** ở sidebar → vào `/case-files`
+2. ✅ **Kết quả**: trang tải được, hiển thị danh sách hồ sơ
+
+### Bước 7.2 — Tạo hồ sơ mới
+
+1. Click **"+ Tạo hồ sơ"**
+2. Điền: Mã hồ sơ `HS-TEST-2026`, Tên hồ sơ `Hồ sơ dự án thử nghiệm`, Năm lưu `2026`
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: hồ sơ xuất hiện trong danh sách
+
+---
+
+## PHẦN 8 — TÌM KIẾM
+
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
+
+### Bước 8.1 — Tìm kiếm cơ bản
+
+1. Click **"Tìm kiếm"** ở sidebar → vào `/search`
+2. Gõ từ khóa `công văn` vào ô tìm kiếm, nhấn Enter hoặc click **"Tìm"**
+3. ✅ **Kết quả**: danh sách kết quả hiển thị các văn bản khớp từ khóa
+
+### Bước 8.2 — Tìm kiếm với bộ lọc
+
+1. Ở trang tìm kiếm, sử dụng các bộ lọc:
+   - Loại văn bản: chọn một loại
+   - Trạng thái: chọn "Đang xử lý"
+   - Khoảng thời gian: đặt từ đầu tháng đến nay
+2. Click **"Tìm"**
+3. ✅ **Kết quả**: kết quả thu hẹp theo bộ lọc
+
+---
+
+## PHẦN 9 — AI CHATBOT
+
+*Thực hiện tại **bất kỳ trình duyệt nào** (TK1 hoặc TK2)*
+
+### Bước 9.1 — Mở chatbot
+
+1. Nhìn vào góc dưới phải màn hình → thấy icon **💬** chatbot nổi
+2. Click vào đó để mở hộp chat
+3. ✅ **Kết quả**: hộp chat mở ra, có ô nhập tin nhắn
+
+### Bước 9.2 — Hỏi về quy trình
+
+1. Gõ: `Hướng dẫn tạo công văn mới`
+2. Nhấn Enter hoặc click gửi
+3. ✅ **Kết quả**: AI trả lời bằng tiếng Việt, giải thích các bước
+
+### Bước 9.3 — Hỏi về tìm kiếm văn bản
+
+1. Gõ tiếp: `Làm thế nào để tìm văn bản theo ngày?`
+2. ✅ **Kết quả**: AI trả lời hướng dẫn cụ thể
+
+### Bước 9.4 — Test hỏi ngoài phạm vi
+
+1. Gõ: `Thời tiết hôm nay thế nào?`
+2. ✅ **Kết quả**: AI từ chối hoặc trả lời rằng chỉ hỗ trợ về quản lý văn bản
+
+---
+
+## PHẦN 10 — THÔNG BÁO
+
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
+
+### Bước 10.1 — Xem thông báo
+
+1. Click **"Thông báo"** ở sidebar → vào `/notifications`  
+   *hoặc* click icon chuông 🔔 ở topbar (nếu có)
+2. ✅ **Kết quả**: danh sách thông báo hiển thị. Các thao tác vừa làm (phê duyệt, từ chối) có thể đã tạo thông báo
+
+### Bước 10.2 — Đánh dấu đã đọc
+
+1. Ở một thông báo chưa đọc, click vào nó hoặc click **"Đánh dấu đã đọc"**
+2. ✅ **Kết quả**: thông báo không còn hiển thị trạng thái "Chưa đọc" (background thay đổi)
+
+---
+
+## PHẦN 11 — ỦY QUYỀN
+
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
+
+### Bước 11.1 — Tạo ủy quyền
+
+1. Click **"Ủy quyền"** ở sidebar → vào `/delegation`
 2. Click **"+ Tạo ủy quyền"**
-3. Điền:
-   - ID người được ủy quyền: `1002`
-   - Từ ngày: `2026-06-01`
-   - Đến ngày: `2026-06-30`
-   - Phạm vi: `Ký duyệt công văn đến`
+3. Điền form:
+   - Người được ủy quyền: chọn từ dropdown (ví dụ: Admin hoặc user khác)
+   - Từ ngày: ngày mai
+   - Đến ngày: một tuần sau
+   - Phạm vi ủy quyền: `Ký duyệt công văn đến trong thời gian nghỉ phép`
 4. Click **"Tạo ủy quyền"**
-5. ✅ **Kỳ vọng**: bảng cập nhật, hiện dòng mới với badge "Hiệu lực"
+5. ✅ **Kết quả**: bảng ủy quyền cập nhật, hiển thị dòng mới với badge **"Hiệu lực"**
 
-### G2. Tạo ủy quyền (API)
+### Bước 11.2 — Hủy ủy quyền
 
-```bash
-curl -X POST http://localhost:8080/api/workflows/delegations \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nguoiUyQuyenId": 1001,
-    "nguoiDuocUyQuyenId": 1002,
-    "tuNgay": "2026-06-01",
-    "denNgay": "2026-06-30",
-    "phamViUyQuyen": "Ký duyệt công văn đến",
-    "ghiChu": "Nghỉ phép"
-  }'
-```
-
-### G3. Lấy danh sách ủy quyền
-
-```bash
-curl "http://localhost:8080/api/workflows/delegations?nguoiUyQuyenId=1001" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### G4. Hủy ủy quyền
-
-```bash
-DELEGATION_ID=<id từ G3>
-
-curl -X DELETE "http://localhost:8080/api/workflows/delegations/$DELEGATION_ID" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-✅ **Kỳ vọng (UI):** badge chuyển sang "Hết hạn / Đã hủy"
+1. Ở dòng ủy quyền vừa tạo, click **"Hủy"** hoặc **"Xóa"**
+2. Xác nhận trong hộp thoại
+3. ✅ **Kết quả**: trạng thái đổi sang "Đã hủy" hoặc dòng bị xóa khỏi danh sách
 
 ---
 
-## 11. Phase H — Tìm Kiếm
+## PHẦN 12 — HỒ SƠ CÁ NHÂN
 
-### H1. Tìm kiếm cơ bản (UI)
+*Thực hiện tại **Cửa sổ ẩn danh (TK1)***
 
-1. Vào `/search`
-2. Gõ từ khóa "công văn" vào ô tìm kiếm
-3. ✅ **Kỳ vọng**: kết quả trả về, khớp văn bản có từ này
+### Bước 12.1 — Xem hồ sơ cá nhân
 
-### H2. Tìm kiếm semantic (AI)
-
-```bash
-curl -X POST http://localhost:8080/api/ai/search/semantic \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "văn bản về phân bổ kinh phí",
-    "userId": 1001,
-    "topK": 5
-  }'
-```
-
-✅ **Kỳ vọng:** danh sách document chunks liên quan, ranked theo similarity
-
-### H3. Tìm kiếm theo bộ lọc (API)
-
-```bash
-curl "http://localhost:8080/api/documents/incoming?keyword=kinh+phi&loaiVanBanId=1&trangThai=1" \
-  -H "Authorization: Bearer $TOKEN"
-```
+1. Click vào **tên người dùng** ở sidebar hoặc click **"Hồ sơ cá nhân"** → vào `/profile`
+2. ✅ **Kết quả**: hiển thị thông tin: họ tên, email, đơn vị, chức vụ, nhóm quyền
 
 ---
 
-## 12. Phase I — AI Chatbot
+## PHẦN 13 — QUẢN TRỊ ADMIN
 
-### I1. Chat từ UI
+*Toàn bộ phần này thực hiện tại **Cửa sổ thường (TK2 - Admin)***
 
-1. Đăng nhập (token phải tồn tại)
-2. Click icon **💬** chatbot ở góc phải màn hình
-3. Gửi: `"Hướng dẫn tạo công văn mới"`
-4. ✅ **Kỳ vọng**: AI trả lời bằng tiếng Việt về quy trình tạo công văn
+> Sidebar Admin có mục **"Quản trị"** với các submenu bên dưới.
 
-### I2. Chat API (public, không cần auth)
+### Bước 13.1 — Quản lý người dùng
 
-```bash
-curl -X POST http://localhost:8080/api/ai/chatbot/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Làm thế nào để phê duyệt văn bản?",
-    "sessionId": "test-session-001"
-  }'
-```
+1. Vào **Quản trị → Quản lý người dùng** (`/admin/users`)
+2. ✅ **Kết quả**: danh sách tất cả user trong hệ thống hiển thị (ít nhất 2–4 user)
 
-✅ **Kỳ vọng:** `{"reply":"...","success":true}`
+**Test tạo user:**
+1. Click **"+ Thêm người dùng"**
+2. Điền: Username `testuser01`, Họ tên `Người Dùng Test`, Email `testuser01@test.vn`, Đơn vị chọn từ dropdown, Nhóm quyền: USER
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: user mới xuất hiện trong danh sách
 
-### I3. Rate limit
+**Test khóa user:**
+1. Tìm user vừa tạo, click **"Khóa"** hoặc toggle trạng thái
+2. ✅ **Kết quả**: badge trạng thái đổi sang "Không hoạt động"
 
-```bash
-# Gửi 6 request liên tiếp nhanh (giới hạn 5/phút/IP)
-for i in 1 2 3 4 5 6; do
-  curl -X POST http://localhost:8080/api/ai/chatbot/ask \
-    -H "Content-Type: application/json" \
-    -d "{\"message\":\"test $i\",\"sessionId\":\"rate-test\"}"
-done
-```
+### Bước 13.2 — Phân quyền
 
-✅ **Kỳ vọng:** request 6 trả về `429 Too Many Requests` với `"RATE_LIMITED"`
+1. Vào **Quản trị → Phân quyền** (`/admin/permissions`)
+2. ✅ **Kết quả**: danh sách các nhóm quyền (ADMIN, MANAGER, USER) với mô tả quyền hạn
 
-### I4. Tóm tắt văn bản (AI)
+**Test xem chi tiết nhóm quyền:**
+1. Click vào nhóm "USER" để xem chi tiết quyền
+2. ✅ **Kết quả**: danh sách quyền của nhóm hiển thị
 
-```bash
-curl -X POST http://localhost:8080/api/ai/summarize \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "documentId": 5001,
-    "userId": 1001,
-    "content": "Văn bản về việc phân bổ kinh phí cho các dự án trọng điểm năm 2026 tổng cộng 5 tỷ đồng...",
-    "summaryType": "brief",
-    "language": "vi"
-  }'
-```
+### Bước 13.3 — Quản lý đơn vị
 
-### I5. Phân loại văn bản (AI)
+1. Vào **Quản trị → Quản lý đơn vị** (`/admin/units`)
+2. ✅ **Kết quả**: danh sách phòng ban/đơn vị của cơ quan
 
-```bash
-curl -X POST http://localhost:8080/api/ai/classify \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "documentId": 5001,
-    "userId": 1001,
-    "content": "Công văn về phân bổ kinh phí",
-    "language": "vi"
-  }'
-```
+**Test tạo đơn vị mới:**
+1. Click **"+ Thêm đơn vị"**
+2. Điền: Mã `DV-TEST`, Tên đơn vị `Phòng Test`, Email `test@coquan.vn`
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: đơn vị mới xuất hiện trong danh sách
 
----
+### Bước 13.4 — Quản lý loại văn bản
 
-## 13. Phase J — Quản Trị Admin
+1. Vào **Quản trị → Loại văn bản** (`/admin/document-types`)
+2. ✅ **Kết quả**: danh sách loại văn bản (Công văn, Biên bản, Đề xuất, v.v.)
 
-> Cần tài khoản `admin` (ADMIN role). Đăng nhập dev: `{"username":"admin"}`
+**Test tạo loại văn bản:**
+1. Click **"+ Thêm loại văn bản"**
+2. Điền: Mã `LVB-TEST`, Tên `Loại văn bản test`, Mô tả `Dùng để test`
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: loại mới xuất hiện trong danh sách
 
-### J1. Quản lý người dùng (UI)
+### Bước 13.5 — Quản lý quy trình
 
-1. Đăng nhập `admin`
-2. Vào `/admin/users`
-3. ✅ **Kỳ vọng**: danh sách 4 user từ seed hiện ra
+1. Vào **Quản trị → Quy trình xử lý** (`/admin/workflows`)
+2. ✅ **Kết quả**: danh sách quy trình phê duyệt đang có trong hệ thống
 
-### J2. Tạo người dùng mới
+**Test xem chi tiết quy trình:**
+1. Click vào một quy trình để xem các bước
+2. ✅ **Kết quả**: danh sách các bước quy trình (Bước 1: Chuyên viên → Bước 2: Trưởng phòng, v.v.)
 
-```bash
-curl -X POST http://localhost:8080/api/auth/users \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userName": "testuser01",
-    "hoTen": "Người Dùng Test",
-    "email": "testuser01@coquan.gov.vn",
-    "dienThoai": "0901234567",
-    "donViId": 2,
-    "chucVu": "Chuyên viên",
-    "nhomQuyenId": 2
-  }'
-```
+**Test tạo quy trình mới:**
+1. Click **"+ Thêm quy trình"**
+2. Điền: Mã `QT-TEST`, Tên `Quy trình test đơn giản`, chọn loại văn bản
+3. Click **"Lưu"**
+4. Vào quy trình vừa tạo → click **"+ Thêm bước"**
+5. Điền: Tên bước `Trưởng phòng duyệt`, Thứ tự 1, Thời gian xử lý 2 ngày
+6. ✅ **Kết quả**: bước mới xuất hiện trong quy trình
 
-### J3. Cập nhật trạng thái user
+### Bước 13.6 — Quản lý mẫu văn bản
 
-```bash
-USER_ID=<id từ J2>
+1. Vào **Quản trị → Mẫu văn bản** (`/admin/templates`)
+2. ✅ **Kết quả**: danh sách các mẫu soạn thảo có sẵn
 
-curl -X PATCH "http://localhost:8080/api/auth/users/$USER_ID/status" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"trangThai": 0}'
-```
+**Test tạo mẫu mới:**
+1. Click **"+ Thêm mẫu"**
+2. Điền tên mẫu, chọn loại văn bản, nhập nội dung mẫu
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: mẫu mới xuất hiện trong danh sách
 
-✅ **Kỳ vọng:** user bị khóa, không đăng nhập được
+### Bước 13.7 — Quản lý SLA
 
-### J4. Phân quyền
+1. Vào **Quản trị → Quản lý SLA** (`/admin/sla`)
+2. Chọn một quy trình từ dropdown **"Chọn quy trình"**
+3. ✅ **Kết quả**: bảng SLA hiển thị thời gian xử lý của từng bước trong quy trình
 
-```bash
-curl -X PATCH "http://localhost:8080/api/auth/users/$USER_ID/role" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"nhomQuyenId": 1}'
-```
+**Test chỉnh sửa SLA:**
+1. Ở một dòng bước quy trình, click **"Chỉnh sửa"**
+2. Sửa thời gian xử lý (ví dụ: từ 2 → 3), đổi đơn vị sang "Ngày"
+3. Click **"Lưu"**
+4. ✅ **Kết quả**: giá trị cập nhật ngay trong bảng không cần reload trang
 
-### J5. Quản lý đơn vị
-
-```bash
-# Tạo đơn vị mới
-curl -X POST http://localhost:8080/api/auth/don-vi \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "maDonVi": "DV-004",
-    "tenDonVi": "Phòng Tài chính",
-    "dienThoai": "024-5555555",
-    "email": "taichinh@coquan.gov.vn",
-    "suDung": true
-  }'
-```
-
-### J6. Quản lý loại văn bản (UI)
-
-1. Vào `/admin/document-types`
-2. ✅ **Kỳ vọng**: 3 loại từ seed hiện ra (Công văn, Biên bản, Đề xuất)
-
-### J7. Quản lý quy trình (UI)
-
-1. Vào `/admin/workflows`
-2. Click vào "Quy trình công văn chuẩn"
-3. ✅ **Kỳ vọng**: hiển thị 3 bước quy trình
-4. Test tạo quy trình mới với 2 bước
-
-### J8. Tạo workflow (API)
-
-```bash
-curl -X POST http://localhost:8080/api/workflows \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "maQuyTrinh": "QTP-TEST",
-    "tenQuyTrinh": "Quy trình test",
-    "loaiVanBanId": 3,
-    "mota": "Quy trình thử nghiệm",
-    "suDung": true
-  }'
-```
-
-### J9. Thêm bước vào workflow
-
-```bash
-WF_ID=<id từ J8>
-
-curl -X POST "http://localhost:8080/api/workflows/$WF_ID/steps" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenBuoc": "Bước duyệt test",
-    "thuTuBuoc": 1,
-    "vaiTroXuLy": "TRUONGPHONG",
-    "thoiGianXuLy": 48,
-    "batBuocPheDuyet": true
-  }'
-```
-
-### J10. Quản lý template (UI)
-
-1. Vào `/admin/templates`
-2. Xem 2 template mẫu có sẵn
-3. Test tạo template mới
-
-### J11. SLA Management (UI)
-
-1. Vào `/admin/sla`
-2. ✅ **Kỳ vọng**: danh sách SLA rules theo workflow
-
-### J12. SLA violations
-
-```bash
-curl "http://localhost:8080/api/workflows/sla/violations?fromDate=2026-01-01&toDate=2026-12-31" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### J13. System Monitoring (UI)
-
-1. Vào `/admin/monitoring`
-2. ✅ **Kỳ vọng**: trang hiển thị trạng thái service (Up/Down), Kafka, DB
+**Test xem vi phạm SLA:**
+1. Click tab **"Vi phạm SLA"**
+2. ✅ **Kết quả**: danh sách văn bản quá hạn xử lý (nếu có), hoặc thông báo "Không có vi phạm SLA ✅"
 
 ---
 
-## 14. Phase K — Báo Cáo & Thống Kê
+## PHẦN 14 — GIÁM SÁT HỆ THỐNG
 
-### K1. Dashboard báo cáo (UI)
+*Thực hiện tại **Cửa sổ thường (TK2 - Admin)***
 
-1. Đăng nhập admin
-2. Vào `/admin/reports`
-3. ✅ **Kỳ vọng**: biểu đồ thống kê văn bản, trạng thái
+### Bước 14.1 — Xem trạng thái dịch vụ
 
-### K2. Dashboard API
+1. Vào **Quản trị → Giám sát hệ thống** (`/admin/monitoring`)
+2. ✅ **Kết quả**: trang hiển thị trạng thái Up/Down của các microservice (Auth, Document, Workflow, AI, Notification), tình trạng Kafka, Database
 
-```bash
-curl "http://localhost:8080/api/reports/dashboard?fromDate=2026-01-01&toDate=2026-12-31" \
-  -H "Authorization: Bearer $TOKEN"
+---
+
+## PHẦN 15 — BÁO CÁO & THỐNG KÊ
+
+*Thực hiện tại **Cửa sổ thường (TK2 - Admin)***
+
+### Bước 15.1 — Xem tổng quan báo cáo
+
+1. Vào **Quản trị → Thống kê & Báo cáo** (`/admin/reports`)
+2. ✅ **Kết quả**: trang hiển thị các thẻ thống kê:
+   - Tổng văn bản, Văn bản đến, Văn bản đi
+   - Đã xử lý, Đang xử lý, Quá hạn
+   - Tỉ lệ hoàn thành (%)
+3. Biểu đồ "Số văn bản theo tháng" hiển thị (nếu có dữ liệu)
+4. Bảng "Tiến độ xử lý quy trình" hiển thị số nhiệm vụ
+
+### Bước 15.2 — Lọc theo khoảng thời gian
+
+1. Chọn **Từ ngày** và **Đến ngày** ở bộ lọc phía trên
+2. Click **"Lọc"**
+3. ✅ **Kết quả**: các số liệu cập nhật theo khoảng thời gian đã chọn
+
+### Bước 15.3 — Xuất báo cáo
+
+1. Click **"Xuất CSV"** → file CSV tải về máy
+2. Mở file, kiểm tra dữ liệu (Chỉ số, Giá trị)
+3. Click **"Xuất Excel"** → file xlsx tải về (hoặc fallback sang CSV)
+4. ✅ **Kết quả**: file tải về thành công
+
+---
+
+## PHẦN 16 — NHẬT KÝ HOẠT ĐỘNG (AUDIT LOG)
+
+*Thực hiện tại **Cửa sổ thường (TK2 - Admin)***
+
+### Bước 16.1 — Xem nhật ký
+
+1. Vào **Quản trị → Nhật ký hoạt động** (`/admin/audit-logs`)
+2. ✅ **Kết quả**: danh sách các hành động trong hệ thống: đăng nhập, tạo văn bản, phê duyệt, v.v. kèm thời gian và người thực hiện
+
+### Bước 16.2 — Lọc nhật ký
+
+1. Sử dụng bộ lọc trên trang (theo người dùng, theo thời gian, theo loại hành động)
+2. ✅ **Kết quả**: danh sách thu hẹp theo điều kiện lọc
+
+---
+
+## PHẦN 17 — ĐĂNG XUẤT
+
+### Bước 17.1 — Đăng xuất TK1
+
+*Tại cửa sổ ẩn danh (TK1)*
+
+1. Click vào tên người dùng ở sidebar hoặc avatar góc trên
+2. Click **"Đăng xuất"**
+3. ✅ **Kết quả**: chuyển về trang `/login`, không thể truy cập `/dashboard` khi gõ tay vào URL
+
+### Bước 17.2 — Đăng xuất TK2
+
+*Tại cửa sổ thường (TK2)*
+
+1. Lặp lại thao tác đăng xuất tương tự
+2. ✅ **Kết quả**: về trang login
+
+---
+
+## Kịch Bản End-to-End Tổng Hợp
+
+Kịch bản này chạy liên tục không ngắt, dùng để demo toàn bộ luồng nghiệp vụ:
+
 ```
+BƯỚC 1 — Đăng nhập 2 tài khoản trên 2 cửa sổ
+  → TK1 (ẩn danh): 102230222@sv1.dut.udn.vn
+  → TK2 (thường):  102230238@sv1.dut.udn.vn
 
-✅ **Kỳ vọng:** JSON có `totalDocuments`, `pendingApprovals`, `overdueCount`, v.v.
+BƯỚC 2 — TK1 tạo văn bản đi
+  → Vào /outgoing → "+ Tạo văn bản đi"
+  → Điền thông tin → Lưu
+  → Click "Trình duyệt" → chọn quy trình → Xác nhận
 
-### K3. Thống kê văn bản
+BƯỚC 3 — TK2 phê duyệt
+  → Vào /approvals → thấy văn bản vừa trình
+  → Click "Phê duyệt" → ghi chú → Xác nhận
 
-```bash
-curl "http://localhost:8080/api/reports/documents/statistics?fromDate=2026-01-01&toDate=2026-12-31&groupBy=month" \
-  -H "Authorization: Bearer $TOKEN"
-```
+BƯỚC 4 — TK1 kiểm tra thông báo
+  → Vào /notifications
+  → Thấy thông báo "Văn bản CV-TEST-001 đã được phê duyệt"
 
-### K4. Tiến độ workflow
+BƯỚC 5 — TK1 xem trạng thái văn bản
+  → Vào /outgoing → thấy trạng thái "Đã duyệt"
 
-```bash
-curl "http://localhost:8080/api/reports/workflows/progress?fromDate=2026-01-01" \
-  -H "Authorization: Bearer $TOKEN"
-```
+BƯỚC 6 — TK1 tìm kiếm văn bản
+  → Vào /search → gõ "TEST" → thấy kết quả
 
-### K5. Văn bản quá hạn
+BƯỚC 7 — TK1 dùng AI chatbot hỏi quy trình
+  → Click icon 💬 → hỏi "Làm thế nào để xem trạng thái văn bản?"
 
-```bash
-curl "http://localhost:8080/api/reports/overdue-documents?page=0&size=10" \
-  -H "Authorization: Bearer $TOKEN"
-```
+BƯỚC 8 — TK2 xem báo cáo
+  → Vào /admin/reports → xem thống kê, xuất CSV
 
-### K6. Xuất báo cáo
+BƯỚC 9 — TK2 xem audit log
+  → Vào /admin/audit-logs → thấy toàn bộ thao tác vừa làm
 
-```bash
-curl "http://localhost:8080/api/reports/export?reportType=documents&format=json&fromDate=2026-01-01&toDate=2026-12-31" \
-  -H "Authorization: Bearer $TOKEN"
+BƯỚC 10 — Đăng xuất cả 2 tài khoản
 ```
 
 ---
 
-## 15. Phase L — Audit Log
-
-### L1. Xem audit log (UI)
-
-1. Vào `/admin/audit-logs`
-2. ✅ **Kỳ vọng**: nhật ký hoạt động hệ thống (login, tạo văn bản, phê duyệt)
-
-### L2. Lấy audit log (API)
-
-```bash
-curl "http://localhost:8080/api/audit-logs?page=0&size=20" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### L3. Lọc theo người dùng
-
-```bash
-curl "http://localhost:8080/api/audit-logs?nguoiDungId=1001&page=0&size=10" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### L4. Lọc theo khoảng thời gian
-
-```bash
-curl "http://localhost:8080/api/audit-logs?fromDate=2026-05-01T00:00:00&toDate=2026-05-31T23:59:59" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-## 16. Phase M — API Trực Tiếp (Postman Collection)
-
-### M1. Chuỗi test nhanh bằng bash
-
-```bash
-# Bước 1: Đăng nhập lấy token
-RESP=$(curl -s -X POST http://localhost:8080/api/auth/login/dev \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin"}')
-TOKEN=$(echo $RESP | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])")
-echo "TOKEN: $TOKEN"
-
-# Bước 2: Lấy danh sách user
-curl -s http://localhost:8080/api/auth/users \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-
-# Bước 3: Lấy danh sách văn bản đến
-curl -s http://localhost:8080/api/documents/incoming \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-
-# Bước 4: Lấy danh sách workflow
-curl -s http://localhost:8080/api/workflows \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-
-# Bước 5: Dashboard report
-curl -s "http://localhost:8080/api/reports/dashboard" \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-```
-
-### M2. Test Security — Non-admin không được vào /api/auth/users
-
-```bash
-# Đăng nhập với user thường
-RESP=$(curl -s -X POST http://localhost:8080/api/auth/login/dev \
-  -H "Content-Type: application/json" \
-  -d '{"username":"nguyenvana"}')
-USER_TOKEN=$(echo $RESP | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])")
-
-# Thử truy cập user management
-curl -s http://localhost:8080/api/auth/users \
-  -H "Authorization: Bearer $USER_TOKEN"
-# Kỳ vọng: 403 Forbidden
-```
-
----
-
-## 17. Kịch Bản End-to-End Hoàn Chỉnh
-
-### Kịch bản 1: Tiếp nhận → Xử lý → Phê duyệt
-
-```
-1. [admin] Tạo văn bản đến: POST /api/documents/incoming
-   → Ghi nhớ documentId
-
-2. [admin] Chuyển xử lý cho nguyenvana:
-   POST /api/documents/incoming/{id}/transfer
-   body: {"nguoiNhanId":1002, "donViNhanId":1, "hanXuLy":"2026-06-30"}
-
-3. [nguyenvana] Đăng nhập, vào /inbox
-   → Thấy văn bản vừa được chuyển
-
-4. [admin] Submit phê duyệt qua workflow:
-   POST /api/documents/outgoing/{id}/submit-approval
-   body: {"quyTrinhId":1}
-
-5. [truongdv] Vào /approvals, thấy văn bản chờ duyệt
-   POST /api/workflows/approvals/{processingId}/approve
-
-6. [admin] Kiểm tra timeline:
-   GET /api/workflows/documents/{id}/timeline
-   → Thấy đủ 2 bước: Transfer + Approve
-
-7. Kiểm tra notification:
-   GET /api/notifications?nguoiNhanId=1002
-   → Thấy thông báo "Văn bản đã được phê duyệt"
-```
-
-### Kịch bản 2: Văn bản đi → Phê duyệt → Phát hành
-
-```
-1. [nguyenvana] Tạo nháp: POST /api/documents/drafts
-
-2. [nguyenvana] Chuyển thành văn bản đi:
-   POST /api/documents/outgoing
-   → documentId = X
-
-3. [nguyenvana] Submit phê duyệt:
-   POST /api/documents/outgoing/X/submit-approval
-
-4. [truongdv] Phê duyệt:
-   POST /api/workflows/approvals/{processingId}/approve
-
-5. Kiểm tra trạng thái:
-   GET /api/workflows/documents/X/status
-   → trangThai: "APPROVED"
-```
-
-### Kịch bản 3: AI hỗ trợ xử lý văn bản
-
-```
-1. Upload file đính kèm cho VB-001:
-   POST /api/documents/5001/attachments (multipart)
-
-2. AI tóm tắt nội dung:
-   POST /api/ai/summarize (content từ file)
-
-3. AI gợi ý xử lý:
-   POST /api/ai/suggestions/handling
-   body: {"documentId":5001,"userId":1001,"content":"..."}
-
-4. Chatbot hỏi về quy trình:
-   POST /api/ai/chatbot/ask
-   body: {"message":"Quy trình xử lý công văn đến gồm mấy bước?"}
-```
-
----
-
-## 18. Checklist Tổng Kết
+## Checklist Nhanh Trước Khi Nộp
 
 ### Hạ tầng
+- [ ] Docker Desktop đang chạy, tất cả container `qlda-*` ở trạng thái Running
+- [ ] `http://localhost:5173` mở được
+- [ ] `http://localhost:8761` hiển thị các service đã đăng ký
 
-- [ ] 10 container Docker đang Up
-- [ ] 5 service đăng ký trên Eureka (port 8761)
-- [ ] Frontend chạy tại localhost:5173
-- [ ] PostgreSQL nhận kết nối (port 5432)
-- [ ] Kafka đang chạy (port 9092)
-
-### Authentication
-
-- [ ] Azure SSO login thành công (redirect + callback)
-- [ ] Dev login trả về token hợp lệ
-- [ ] Refresh token hoạt động
-- [ ] Logout xóa token
-- [ ] Truy cập không có token → 401
-- [ ] User thường truy cập admin endpoint → 403
+### Đăng nhập
+- [ ] TK1 đăng nhập Azure thành công, vào được Dashboard
+- [ ] TK2 đăng nhập Azure thành công, vào được Dashboard
+- [ ] Đăng xuất → redirect về `/login`
 
 ### Văn bản
+- [ ] `/inbox` tải được, xem chi tiết văn bản được
+- [ ] `/upload` upload file thành công
+- [ ] `/outgoing` tạo văn bản đi thành công
+- [ ] Submit văn bản đi để phê duyệt thành công
 
-- [ ] Tạo văn bản đến
-- [ ] Upload file đính kèm
-- [ ] Chuyển xử lý
-- [ ] Tạo văn bản đi
-- [ ] Submit phê duyệt
+### Quy trình phê duyệt
+- [ ] `/approvals` hiển thị danh sách chờ duyệt
+- [ ] Phê duyệt đồng ý → trạng thái đổi thành "Đã duyệt"
+- [ ] Từ chối → trạng thái đổi thành "Từ chối"
 
-### Workflow
-
-- [ ] Xem danh sách chờ duyệt
-- [ ] Phê duyệt (approve)
-- [ ] Từ chối (reject)
-- [ ] Xem timeline
-
-### Thông báo
-
-- [ ] Thông báo in-app
-- [ ] Đánh dấu đã đọc
-- [ ] Teams webhook gửi được
-- [ ] Email SMTP gửi được
-
-### AI
-
-- [ ] Chatbot trả lời (UI + API)
-- [ ] Rate limit 429 sau 5 request
-- [ ] Tóm tắt văn bản
-- [ ] Phân loại văn bản
+### Tính năng khác
+- [ ] `/search` tìm kiếm văn bản được
+- [ ] Chatbot 💬 trả lời được câu hỏi tiếng Việt
+- [ ] `/notifications` hiển thị thông báo, đánh dấu đã đọc được
+- [ ] `/delegation` tạo ủy quyền được
 
 ### Admin
-
-- [ ] CRUD người dùng
-- [ ] CRUD đơn vị
-- [ ] CRUD quy trình + bước
-- [ ] CRUD loại văn bản
-- [ ] SLA violations
-- [ ] System monitoring
-
-### Báo cáo
-
-- [ ] Dashboard report
-- [ ] Document statistics
-- [ ] Workflow progress
-- [ ] Overdue documents
-- [ ] Export report
-
-### Audit
-
-- [ ] Xem audit log
-- [ ] Lọc theo user
-- [ ] Lọc theo thời gian
+- [ ] `/admin/users` xem + tạo + khóa user được
+- [ ] `/admin/units` xem + tạo đơn vị được
+- [ ] `/admin/document-types` xem + tạo loại văn bản được
+- [ ] `/admin/workflows` xem + tạo quy trình + thêm bước được
+- [ ] `/admin/templates` xem + tạo mẫu văn bản được
+- [ ] `/admin/sla` chọn quy trình, sửa thời gian SLA được
+- [ ] `/admin/monitoring` xem trạng thái dịch vụ được
+- [ ] `/admin/reports` xem thống kê, xuất CSV được
+- [ ] `/admin/audit-logs` xem nhật ký được
 
 ---
 
-## Ghi Chú Quan Trọng
+## Xử Lý Sự Cố Thường Gặp
 
-| Vấn đề | Cách xử lý |
-|---|---|
-| 503 Service Unavailable | Đợi 15-30s sau rebuild để Eureka sync |
-| 401 sau đăng nhập | Kiểm tra localStorage `access_token` |
-| 500 khi tạo văn bản | Kiểm tra `loaiVanBanId`, `donViId` có tồn tại trong DB |
-| Chatbot không trả lời | Kiểm tra `GEMINI_API_KEY` trong `.env` |
-| Teams không nhận được | Kiểm tra `TEAMS_WEBHOOK_URL` trong `.env` |
-| Email không gửi được | Kiểm tra `SPRING_MAIL_PASSWORD` trong `.env`, bật 2FA app password |
-| Docker không chạy được | Chạy với `--context desktop-linux` |
-
----
-
-*File này được tạo tự động dựa trên phân tích toàn bộ source code và cấu hình hệ thống QLDA.*
+| Vấn đề | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Trang trắng sau đăng nhập | Token không hợp lệ | Xóa dữ liệu trình duyệt (F12 → Application → Clear site data) rồi đăng nhập lại |
+| "Lỗi đăng nhập Azure" | Container auth-service chưa chạy | Kiểm tra Docker, đợi 30 giây sau khi start rồi thử lại |
+| Trang báo 401 / 403 | Token hết hạn hoặc sai quyền | Đăng xuất và đăng nhập lại |
+| Upload thất bại | File quá lớn hoặc sai định dạng | Dùng file PDF/DOCX nhỏ hơn 10MB |
+| Chatbot không trả lời | API key Gemini chưa cấu hình | Kiểm tra `GEMINI_API_KEY` trong `qlda-system/.env` |
+| Danh sách rỗng | Chưa có dữ liệu seed hoặc filter quá hẹp | Xóa bộ lọc, thử tạo dữ liệu mới trước |
+| Docker không start | Chưa chạy `docker-compose up` | Chạy: `docker --context desktop-linux compose -f qlda-system/docker-compose.yml up -d` |

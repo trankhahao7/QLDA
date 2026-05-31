@@ -1,13 +1,7 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 .login-container {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  min-height: 100svh;
+  width: 100%;
   font-family: "Inter", "Segoe UI", sans-serif;
   overflow: hidden;
 }

@@ -202,7 +202,7 @@ export default function UserManagement() {
             </option>
           ))}
         </select>
-      </span></div>
+      </div>
 
       {showForm && (
         <div className="admin-form-modal">
@@ -220,7 +220,7 @@ export default function UserManagement() {
                   disabled={!!editingUser}
                   className="form-input"
                 />
-              </span></div>
+              </div>
               <div className="form-group">
                 <label>Họ tên</label>
                 <input
@@ -231,7 +231,7 @@ export default function UserManagement() {
                   }
                   className="form-input"
                 />
-              </span></div>
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Email</label>
@@ -243,7 +243,7 @@ export default function UserManagement() {
                     }
                     className="form-input"
                   />
-                </span></div>
+                </div>
                 <div className="form-group">
                   <label>Điện thoại</label>
                   <input
@@ -254,8 +254,8 @@ export default function UserManagement() {
                     }
                     className="form-input"
                   />
-                </span></div>
-              </span></div>
+                </div>
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Đơn vị</label>
@@ -276,7 +276,7 @@ export default function UserManagement() {
                       </option>
                     ))}
                   </select>
-                </span></div>
+                </div>
                 <div className="form-group">
                   <label>Chức vụ</label>
                   <input
@@ -287,8 +287,8 @@ export default function UserManagement() {
                     }
                     className="form-input"
                   />
-                </span></div>
-              </span></div>
+                </div>
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Nhóm quyền</label>
@@ -309,7 +309,7 @@ export default function UserManagement() {
                       </option>
                     ))}
                   </select>
-                </span></div>
+                </div>
                 <div className="form-group">
                   <label>Trạng thái</label>
                   <select
@@ -325,8 +325,8 @@ export default function UserManagement() {
                     <option value="1">Hoạt động</option>
                     <option value="0">Khóa</option>
                   </select>
-                </span></div>
-              </span></div>
+                </div>
+              </div>
               <div className="form-actions">
                 <button
                   type="button"
@@ -342,10 +342,10 @@ export default function UserManagement() {
                 >
                   Hủy
                 </button>
-              </span></div>
+              </div>
             </form>
-          </span></div>
-        </span></div>
+          </div>
+        </div>
       )}
 
       <table className="admin-table">
@@ -402,7 +402,7 @@ export default function UserManagement() {
 
       <div className="pagination">
         <p>Tổng: {filteredUsers.length} người dùng</p>
-      </span></div>
-    </span></div>
+      </div>
+    </div>
   );
 }

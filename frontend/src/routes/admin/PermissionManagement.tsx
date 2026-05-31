@@ -121,7 +121,7 @@ export default function PermissionManagement() {
         >
           💾 Lưu thay đổi
         </button>
-      </span></div>
+      </div>
 
       <div className="role-selector">
         <label>Chọn nhóm quyền:</label>
@@ -135,8 +135,8 @@ export default function PermissionManagement() {
               {role.tenNhomQuyen}
             </button>
           ))}
-        </span></div>
-      </span></div>
+        </div>
+      </div>
 
       {rolePermissions && (
         <div className="permissions-table-wrapper">
@@ -194,8 +194,8 @@ export default function PermissionManagement() {
               ))}
             </tbody>
           </table>
-        </span></div>
+        </div>
       )}
-    </span></div>
+    </div>
   );
 }
