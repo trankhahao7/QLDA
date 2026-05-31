@@ -27,6 +27,10 @@ public class GeminiConfig {
     public String getBaseUrl() { return baseUrl; }
 
     public String buildApiUrl() {
-        return baseUrl + "/" + model + ":generateContent?key=" + apiKey;
+        return baseUrl + "/" + model + ":generateContent";
+    }
+
+    public String buildEmbeddingUrl(String embeddingModel) {
+        return baseUrl + "/" + embeddingModel + ":embedContent";
     }
 }

@@ -29,11 +29,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -41,21 +39,15 @@ import java.util.Set;
 public class AiApplicationService {
 
     private static final int CHUNK_SIZE = 500;
-    private static final int CHATBOT_TOP_K = 3;
+    private static final int CHUNK_OVERLAP = 80;
+    private static final int CHATBOT_TOP_K = 5;
     private static final List<String> ALLOWED_FILE_EXTENSIONS = List.of("pdf", "doc", "docx", "txt", "png", "jpg", "jpeg");
     private static final Set<String> ALLOWED_SUMMARY_TYPES = Set.of("SHORT", "DETAILED", "BULLET");
     private static final List<String> DEFAULT_CLASSIFICATION_CATEGORIES = List.of(
-        "CONG_VAN",
-        "QUYET_DINH",
-        "THONG_BAO",
-        "KE_HOACH",
-        "BAO_CAO"
+        "CONG_VAN", "QUYET_DINH", "THONG_BAO", "KE_HOACH", "BAO_CAO"
     );
     private static final List<String> DEFAULT_METADATA_FIELDS = List.of(
-        "soKyHieu",
-        "ngayVanBan",
-        "nguoiKy",
-        "doKhan"
+        "soKyHieu", "ngayVanBan", "nguoiKy", "doKhan"
     );
 
     private final AiResultRepository aiResultRepository;
@@ -65,6 +57,7 @@ public class AiApplicationService {
     private final OcrService ocrService;
     private final ObjectMapper objectMapper;
     private final DocumentInternalApiService documentInternalApiService;
+    private final VectorSearchService vectorSearchService;
 
     public Map<String, Object> summarize(SummarizeRequest request) {
         validateSummarizeRequest(request);
@@ -75,13 +68,8 @@ public class AiApplicationService {
             normalizeLanguage(request.language())
         );
         AiResultEntity saved = saveResult(
-            request.documentId(),
-            request.userId(),
-            AiProcessType.SUMMARY,
-            request.text(),
-            output.summary(),
-            output.confidence(),
-            output.modelUsed(),
+            request.documentId(), request.userId(), AiProcessType.SUMMARY,
+            request.text(), output.summary(), output.confidence(), output.modelUsed(),
             "summaryType=" + request.summaryType().trim().toUpperCase() + ",language=" + normalizeLanguage(request.language())
         );
         return Map.of(
@@ -106,14 +94,9 @@ public class AiApplicationService {
         ensureDocumentExists(request.documentId());
         ClassificationOutput output = aiModelService.classify(request.text(), request.categories(), normalizeLanguage(request.language()));
         AiResultEntity saved = saveResult(
-            request.documentId(),
-            request.userId(),
-            AiProcessType.CLASSIFICATION,
-            request.text(),
-            toJson(Map.of("category", output.category(), "reason", output.reason())),
-            output.confidence(),
-            output.modelUsed(),
-            output.reason()
+            request.documentId(), request.userId(), AiProcessType.CLASSIFICATION,
+            request.text(), toJson(Map.of("category", output.category(), "reason", output.reason())),
+            output.confidence(), output.modelUsed(), output.reason()
         );
         return Map.of(
             "resultId", saved.getId(),
@@ -138,13 +121,8 @@ public class AiApplicationService {
         ensureDocumentExists(request.documentId());
         MetadataOutput output = aiModelService.extractMetadata(request.text(), request.fields(), normalizeLanguage(request.language()));
         AiResultEntity saved = saveResult(
-            request.documentId(),
-            request.userId(),
-            AiProcessType.METADATA_EXTRACTION,
-            request.text(),
-            toJson(output.metadata()),
-            output.confidence(),
-            output.modelUsed(),
+            request.documentId(), request.userId(), AiProcessType.METADATA_EXTRACTION,
+            request.text(), toJson(output.metadata()), output.confidence(), output.modelUsed(),
             "fields=" + String.join(",", request.fields())
         );
         return Map.of(
@@ -159,53 +137,64 @@ public class AiApplicationService {
     public Map<String, Object> extractMetadataFile(Long documentId, Long userId, String language, MultipartFile file) {
         validateFile(file);
         String text = ocrService.extractText(file);
-        Map<String, Object> data = extractMetadata(
-            new MetadataExtractRequest(documentId, userId, text, DEFAULT_METADATA_FIELDS, language)
-        );
+        Map<String, Object> data = extractMetadata(new MetadataExtractRequest(documentId, userId, text, DEFAULT_METADATA_FIELDS, language));
         return merge(data, Map.of("fileName", file.getOriginalFilename()));
     }
 
     public Map<String, Object> semanticSearch(SemanticSearchRequest request) {
         List<Double> keywordEmbedding = embeddingService.generateEmbedding(request.keyword());
-        List<RankedChunk> ranked = rankChunks(keywordEmbedding, request.filters());
         int page = request.page() == null ? 0 : Math.max(0, request.page());
         int size = request.size() == null ? 10 : Math.max(1, request.size());
+        int fetchLimit = (page + 1) * size + size;
+
+        Long filterDocumentId = extractDocumentId(request.filters());
+        List<AiDocumentChunkEntity> chunks = vectorSearchService.findTopKBySimilarity(
+            keywordEmbedding, filterDocumentId, fetchLimit
+        );
+
+        List<AiDocumentChunkEntity> filtered = chunks.stream()
+            .filter(c -> matchesMetadataFilters(c, request.filters()))
+            .toList();
 
         int from = page * size;
-        int to = Math.min(from + size, ranked.size());
-        List<Map<String, Object>> content = from >= ranked.size()
+        int to = Math.min(from + size, filtered.size());
+        List<Map<String, Object>> content = from >= filtered.size()
             ? List.of()
-            : ranked.subList(from, to).stream().map(this::toSearchItem).toList();
+            : filtered.subList(from, to).stream().map(this::toSearchItem).toList();
 
         return Map.of(
             "content", content,
             "page", page,
             "size", size,
-            "totalElements", ranked.size()
+            "totalElements", filtered.size()
         );
     }
 
     public Map<String, Object> indexDocument(IndexDocumentRequest request) {
         ensureDocumentExists(request.documentId());
         aiDocumentChunkRepository.deleteByVanBanId(request.documentId());
-        List<String> chunks = splitToChunks(request.text(), CHUNK_SIZE);
+
+        List<String> chunks = splitToChunks(request.text(), CHUNK_SIZE, CHUNK_OVERLAP);
         List<AiDocumentChunkEntity> entities = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             String chunkText = chunks.get(i);
+            List<Double> embedding = embeddingService.generateEmbedding(chunkText);
             AiDocumentChunkEntity entity = AiDocumentChunkEntity.builder()
                 .vanBanId(request.documentId())
                 .tepDinhKemId(request.attachmentId())
                 .chunkIndex(i)
                 .noiDung(chunkText)
-                .embedding(toJson(embeddingService.generateEmbedding(chunkText)))
+                .embedding(vectorSearchService.toVectorString(embedding))
                 .metadata(toJson(request.metadata()))
                 .ngayTao(LocalDateTime.now())
                 .build();
             entities.add(entity);
         }
+
         if (!entities.isEmpty()) {
-            aiDocumentChunkRepository.saveAll(entities);
+            vectorSearchService.insertChunks(entities);
         }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("documentId", request.documentId());
         result.put("attachmentId", request.attachmentId());
@@ -224,14 +213,8 @@ public class AiApplicationService {
         ensureDocumentExists(request.documentId());
         SuggestionHandlingOutput output = aiModelService.suggestHandling(request.text(), request.context());
         AiResultEntity saved = saveResult(
-            request.documentId(),
-            request.userId(),
-            AiProcessType.SUGGESTION_HANDLING,
-            request.text(),
-            toJson(output.suggestions()),
-            output.confidence(),
-            output.modelUsed(),
-            null
+            request.documentId(), request.userId(), AiProcessType.SUGGESTION_HANDLING,
+            request.text(), toJson(output.suggestions()), output.confidence(), output.modelUsed(), null
         );
         return Map.of(
             "resultId", saved.getId(),
@@ -246,13 +229,8 @@ public class AiApplicationService {
         ensureDocumentExists(request.documentId());
         SuggestionReplyOutput output = aiModelService.suggestReply(request.text(), request.replyStyle(), request.language());
         AiResultEntity saved = saveResult(
-            request.documentId(),
-            request.userId(),
-            AiProcessType.SUGGESTION_REPLY,
-            request.text(),
-            output.suggestedReply(),
-            output.confidence(),
-            output.modelUsed(),
+            request.documentId(), request.userId(), AiProcessType.SUGGESTION_REPLY,
+            request.text(), output.suggestedReply(), output.confidence(), output.modelUsed(),
             "replyStyle=" + request.replyStyle()
         );
         return Map.of(
@@ -270,30 +248,33 @@ public class AiApplicationService {
         if (contextDocumentId != null) {
             ensureDocumentExists(contextDocumentId);
         }
+
         List<Double> questionEmbedding = embeddingService.generateEmbedding(request.question());
-        List<RankedChunk> ranked = rankChunks(questionEmbedding, request.context()).stream().limit(CHATBOT_TOP_K).toList();
-        String context = ranked.stream().map(item -> item.chunk().getNoiDung()).reduce("", (a, b) -> a + "\n" + b).trim();
+        List<AiDocumentChunkEntity> topChunks = vectorSearchService.findTopKBySimilarity(
+            questionEmbedding, contextDocumentId, CHATBOT_TOP_K
+        );
+
+        String context = topChunks.stream()
+            .map(AiDocumentChunkEntity::getNoiDung)
+            .reduce("", (a, b) -> a + "\n" + b)
+            .trim();
 
         ChatbotOutput output = aiModelService.answerWithContext(request.question(), context);
-        Long documentId = ranked.isEmpty() ? null : ranked.getFirst().chunk().getVanBanId();
+        Long documentId = topChunks.isEmpty() ? null : topChunks.getFirst().getVanBanId();
+
         AiResultEntity saved = saveResult(
-            documentId,
-            request.userId(),
-            AiProcessType.CHATBOT,
-            request.question(),
-            output.answer(),
-            output.confidence(),
-            output.modelUsed(),
+            documentId, request.userId(), AiProcessType.CHATBOT,
+            request.question(), output.answer(), output.confidence(), output.modelUsed(),
             request.context() == null ? null : toJson(request.context())
         );
 
-        List<Map<String, Object>> sources = ranked.stream().map(item -> {
+        List<Map<String, Object>> sources = topChunks.stream().map(chunk -> {
             Map<String, Object> source = new LinkedHashMap<>();
-            source.put("chunkId", item.chunk().getId());
-            source.put("documentId", item.chunk().getVanBanId());
-            source.put("chunkIndex", item.chunk().getChunkIndex());
+            source.put("chunkId", chunk.getId());
+            source.put("documentId", chunk.getVanBanId());
+            source.put("chunkIndex", chunk.getChunkIndex());
             source.put("reference", "ai_document_chunk");
-            source.put("matchedText", item.chunk().getNoiDung());
+            source.put("matchedText", chunk.getNoiDung());
             return source;
         }).toList();
 
@@ -352,14 +333,8 @@ public class AiApplicationService {
     }
 
     private AiResultEntity saveResult(
-        Long documentId,
-        Long userId,
-        AiProcessType type,
-        String input,
-        String output,
-        Double confidence,
-        String modelUsed,
-        String note
+        Long documentId, Long userId, AiProcessType type,
+        String input, String output, Double confidence, String modelUsed, String note
     ) {
         AiResultEntity entity = AiResultEntity.builder()
             .vanBanID(documentId)
@@ -375,49 +350,56 @@ public class AiApplicationService {
         return aiResultRepository.save(entity);
     }
 
-    private List<RankedChunk> rankChunks(List<Double> queryEmbedding, Map<String, Object> filters) {
-        Long filterDocumentId = extractDocumentId(filters);
-        return aiDocumentChunkRepository.findAll().stream()
-            .filter(chunk -> filterDocumentId == null || Objects.equals(chunk.getVanBanId(), filterDocumentId))
-            .filter(chunk -> matchesMetadataFilters(chunk, filters))
-            .map(chunk -> new RankedChunk(chunk, cosineSimilarity(queryEmbedding, fromJsonVector(chunk.getEmbedding()))))
-            .filter(item -> item.score() > 0)
-            .sorted(Comparator.comparingDouble(RankedChunk::score).reversed())
-            .toList();
-    }
-
-    private Map<String, Object> toSearchItem(RankedChunk rankedChunk) {
-        AiDocumentChunkEntity chunk = rankedChunk.chunk();
+    private Map<String, Object> toSearchItem(AiDocumentChunkEntity chunk) {
         return Map.of(
             "documentId", chunk.getVanBanId(),
             "chunkId", chunk.getId(),
             "chunkIndex", chunk.getChunkIndex(),
-            "score", rankedChunk.score(),
             "matchedText", chunk.getNoiDung(),
             "metadata", fromJsonMap(chunk.getMetadata())
         );
     }
 
-    private List<Double> fromJsonVector(String json) {
-        if (json == null || json.isBlank()) {
-            return List.of();
+    /**
+     * Tách text theo ranh giới câu (sentence-aware) với overlap để giữ context.
+     * Ưu tiên tách tại: dòng trống, xuống dòng, dấu câu kết thúc.
+     */
+    List<String> splitToChunks(String text, int chunkSize, int overlap) {
+        List<String> chunks = new ArrayList<>();
+        String safe = text == null ? "" : text.trim();
+        if (safe.isEmpty()) return chunks;
+
+        int start = 0;
+        while (start < safe.length()) {
+            int end = Math.min(start + chunkSize, safe.length());
+
+            if (end < safe.length()) {
+                int boundary = findSentenceBoundary(safe, start, end);
+                if (boundary > start) end = boundary;
+            }
+
+            chunks.add(safe.substring(start, end).trim());
+            int nextStart = end - overlap;
+            start = nextStart > start ? nextStart : end;
         }
-        try {
-            List<Double> values = objectMapper.readValue(
-                json,
-                objectMapper.getTypeFactory().constructCollectionType(List.class, Double.class)
-            );
-            return values == null ? List.of() : values;
-        } catch (Exception ex) {
-            return List.of();
+        return chunks;
+    }
+
+    private int findSentenceBoundary(String text, int start, int idealEnd) {
+        String[] delimiters = {"\n\n", "\n", ". ", "! ", "? ", ".\n", "!\n", "?\n"};
+        int best = -1;
+        for (String delim : delimiters) {
+            int idx = text.lastIndexOf(delim, idealEnd);
+            if (idx > start && idx > best) {
+                best = idx + delim.length();
+            }
         }
+        return best > start ? best : idealEnd;
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> fromJsonMap(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
+        if (json == null || json.isBlank()) return Map.of();
         try {
             Map<String, Object> values = objectMapper.readValue(json, Map.class);
             return values == null ? Map.of() : values;
@@ -426,58 +408,8 @@ public class AiApplicationService {
         }
     }
 
-    private double cosineSimilarity(List<Double> a, List<Double> b) {
-        if (a == null || b == null || a.isEmpty() || b.isEmpty()) {
-            return 0.0;
-        }
-        int size = Math.min(a.size(), b.size());
-        double dot = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-        for (int i = 0; i < size; i++) {
-            double av = a.get(i);
-            double bv = b.get(i);
-            dot += av * bv;
-            normA += av * av;
-            normB += bv * bv;
-        }
-        if (normA == 0.0 || normB == 0.0) {
-            return 0.0;
-        }
-        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
-    private List<String> splitToChunks(String text, int chunkSize) {
-        List<String> chunks = new ArrayList<>();
-        String safe = text == null ? "" : text.trim();
-        if (safe.isEmpty()) {
-            return chunks;
-        }
-        for (int start = 0; start < safe.length(); start += chunkSize) {
-            int end = Math.min(start + chunkSize, safe.length());
-            chunks.add(safe.substring(start, end));
-        }
-        return chunks;
-    }
-
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "File is empty");
-        }
-        String fileName = file.getOriginalFilename();
-        if (fileName == null || !fileName.contains(".")) {
-            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "Invalid file format");
-        }
-        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
-        if (!ALLOWED_FILE_EXTENSIONS.contains(extension)) {
-            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "Invalid file format");
-        }
-    }
-
     private String toJson(Object value) {
-        if (value == null) {
-            return null;
-        }
+        if (value == null) return null;
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException ex) {
@@ -486,17 +418,12 @@ public class AiApplicationService {
     }
 
     private Long extractDocumentId(Map<String, Object> filters) {
-        if (filters == null) {
-            return null;
-        }
+        if (filters == null) return null;
         Object value = filters.get("documentId");
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
+        if (value instanceof Number number) return number.longValue();
         if (value instanceof String str && !str.isBlank()) {
-            try {
-                return Long.parseLong(str);
-            } catch (NumberFormatException ex) {
+            try { return Long.parseLong(str); }
+            catch (NumberFormatException ex) {
                 throw new AppException(ErrorCode.AI_PROCESSING_FAILED, HttpStatus.BAD_REQUEST, "Invalid documentId filter");
             }
         }
@@ -504,77 +431,44 @@ public class AiApplicationService {
     }
 
     private boolean matchesMetadataFilters(AiDocumentChunkEntity chunk, Map<String, Object> filters) {
-        if (filters == null || filters.isEmpty()) {
-            return true;
-        }
-
+        if (filters == null || filters.isEmpty()) return true;
         Map<String, Object> metadata = fromJsonMap(chunk.getMetadata());
-        if (!matchesDateRange(filters, metadata)) {
-            return false;
-        }
-
+        if (!matchesDateRange(filters, metadata)) return false;
         return filters.entrySet().stream()
-            .filter(entry -> !"documentId".equals(entry.getKey()))
-            .filter(entry -> !"fromDate".equals(entry.getKey()))
-            .filter(entry -> !"toDate".equals(entry.getKey()))
-            .allMatch(entry -> {
-                Object expected = entry.getValue();
-                if (expected == null) {
-                    return true;
-                }
-                Object actual = metadata.get(entry.getKey());
-                return areEquivalent(actual, expected);
+            .filter(e -> !Set.of("documentId", "fromDate", "toDate").contains(e.getKey()))
+            .allMatch(e -> {
+                if (e.getValue() == null) return true;
+                Object actual = metadata.get(e.getKey());
+                return areEquivalent(actual, e.getValue());
             });
     }
 
     private boolean matchesDateRange(Map<String, Object> filters, Map<String, Object> metadata) {
         Object fromRaw = filters.get("fromDate");
         Object toRaw = filters.get("toDate");
-        if (fromRaw == null && toRaw == null) {
-            return true;
-        }
-
+        if (fromRaw == null && toRaw == null) return true;
         LocalDate valueDate = parseDate(metadata.get("ngayVanBan"));
-        if (valueDate == null) {
-            return false;
-        }
-
+        if (valueDate == null) return false;
         LocalDate from = parseDate(fromRaw);
         LocalDate to = parseDate(toRaw);
-
-        if (from != null && valueDate.isBefore(from)) {
-            return false;
-        }
+        if (from != null && valueDate.isBefore(from)) return false;
         return to == null || !valueDate.isAfter(to);
     }
 
     private LocalDate parseDate(Object raw) {
-        if (raw == null) {
-            return null;
-        }
+        if (raw == null) return null;
         String value = String.valueOf(raw).trim();
-        if (value.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(value);
-        } catch (DateTimeParseException ex) {
-            return null;
-        }
+        if (value.isBlank()) return null;
+        try { return LocalDate.parse(value); }
+        catch (DateTimeParseException ex) { return null; }
     }
 
     private boolean areEquivalent(Object actual, Object expected) {
-        if (actual == null) {
-            return false;
+        if (actual == null) return false;
+        if (actual instanceof Number an && expected instanceof Number en) {
+            return Double.compare(an.doubleValue(), en.doubleValue()) == 0;
         }
-
-        if (actual instanceof Number actualNumber && expected instanceof Number expectedNumber) {
-            return Double.compare(actualNumber.doubleValue(), expectedNumber.doubleValue()) == 0;
-        }
-
-        String actualText = String.valueOf(actual).trim();
-        String expectedText = String.valueOf(expected).trim();
-        return actualText.equalsIgnoreCase(expectedText);
+        return String.valueOf(actual).trim().equalsIgnoreCase(String.valueOf(expected).trim());
     }
 
     private Map<String, Object> mapResultSummary(AiResultEntity entity) {
@@ -597,10 +491,7 @@ public class AiApplicationService {
     }
 
     private String normalizeLanguage(String language) {
-        if (language == null || language.isBlank()) {
-            return "vi";
-        }
-        return language.trim();
+        return (language == null || language.isBlank()) ? "vi" : language.trim();
     }
 
     private void validateSummarizeRequest(SummarizeRequest request) {
@@ -630,25 +521,33 @@ public class AiApplicationService {
         }
     }
 
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "File is empty");
+        }
+        String fileName = file.getOriginalFilename();
+        if (fileName == null || !fileName.contains(".")) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "Invalid file format");
+        }
+        String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+        if (!ALLOWED_FILE_EXTENSIONS.contains(extension)) {
+            throw new AppException(ErrorCode.INVALID_FILE_FORMAT, HttpStatus.BAD_REQUEST, "Invalid file format");
+        }
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
     private AiProcessType parseAiProcessType(String loaiXuLyAI) {
-        try {
-            return AiProcessType.valueOf(loaiXuLyAI.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
+        try { return AiProcessType.valueOf(loaiXuLyAI.trim().toUpperCase()); }
+        catch (IllegalArgumentException ex) {
             throw new AppException(ErrorCode.AI_PROCESSING_FAILED, HttpStatus.BAD_REQUEST, "Invalid loaiXuLyAI");
         }
     }
 
     private void ensureDocumentExists(Long documentId) {
-        if (documentId == null) {
-            return;
-        }
+        if (documentId == null) return;
         documentInternalApiService.getDocument(documentId);
-    }
-
-    private record RankedChunk(AiDocumentChunkEntity chunk, double score) {
     }
 }

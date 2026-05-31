@@ -39,10 +39,10 @@ public class AiDocumentChunkEntity {
     @Column(name = "noi_dung", nullable = false, columnDefinition = "TEXT")
     private String noiDung;
 
-    @Column(name = "embedding", columnDefinition = "TEXT")
+    @Column(name = "embedding", columnDefinition = "vector(768)")
     private String embedding;
 
-    @Column(name = "metadata", columnDefinition = "TEXT")
+    @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 
     @Column(name = "ngay_tao")

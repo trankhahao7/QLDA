@@ -1,5 +1,6 @@
 package com.qlda.aiservice.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@ConditionalOnMissingBean(GeminiAiModelService.class)
 public class StubAiModelService implements AiModelService {
 
     @Override

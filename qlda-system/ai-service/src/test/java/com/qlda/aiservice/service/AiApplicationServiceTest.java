@@ -31,6 +31,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +63,9 @@ class AiApplicationServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private VectorSearchService vectorSearchService;
+
     @InjectMocks
     private AiApplicationService aiApplicationService;
 
@@ -72,14 +79,13 @@ class AiApplicationServiceTest {
     void setup() {
         Mockito.lenient().when(aiResultRepository.save(any())).thenAnswer(invocation -> {
             AiResultEntity entity = invocation.getArgument(0);
-            if (entity.getId() == null) {
-                entity.setId(1L);
-            }
+            if (entity.getId() == null) entity.setId(1L);
             return entity;
         });
         Mockito.lenient().when(documentInternalApiService.getDocument(any())).thenReturn(
             new DocumentMetadataDto(1L, "stub", 1L, 1L, 1L, "2026-05-10T10:00:00")
         );
+        Mockito.lenient().when(vectorSearchService.toVectorString(anyList())).thenReturn("[0.1,0.2,0.3]");
     }
 
     @Test
@@ -112,15 +118,12 @@ class AiApplicationServiceTest {
     void shouldCreateChunksWhenIndexDocument() {
         when(embeddingService.generateEmbedding(any())).thenReturn(List.of(0.1, 0.2, 0.3));
         IndexDocumentRequest request = new IndexDocumentRequest(
-            9L,
-            null,
-            "A".repeat(700),
-            Map.of("loaiVanBanId", 1)
+            9L, null, "A".repeat(700), Map.of("loaiVanBanId", 1)
         );
 
         aiApplicationService.indexDocument(request);
 
-        verify(aiDocumentChunkRepository).saveAll(chunkListCaptor.capture());
+        verify(vectorSearchService).insertChunks(chunkListCaptor.capture());
         List<AiDocumentChunkEntity> chunks = chunkListCaptor.getValue();
         assertThat(chunks.size()).isGreaterThan(1);
         assertThat(chunks.getFirst().getChunkIndex()).isEqualTo(0);
@@ -137,23 +140,21 @@ class AiApplicationServiceTest {
     void shouldFetchRelevantChunksBeforeGeneratingChatbotAnswer() {
         when(embeddingService.generateEmbedding("Hoi gi do")).thenReturn(List.of(1.0, 0.0));
         AiDocumentChunkEntity chunk = AiDocumentChunkEntity.builder()
-            .id(1L)
-            .vanBanId(10L)
-            .chunkIndex(0)
+            .id(1L).vanBanId(10L).chunkIndex(0)
             .noiDung("Noi dung lien quan")
-            .embedding("[1.0,0.0]")
-            .metadata("{\"module\":\"DOCUMENT\"}")
+            .embedding("[1.0,0.0]").metadata("{\"module\":\"DOCUMENT\"}")
             .build();
-        when(aiDocumentChunkRepository.findAll()).thenReturn(List.of(chunk));
+        when(vectorSearchService.findTopKBySimilarity(anyList(), isNull(), anyInt()))
+            .thenReturn(List.of(chunk));
         when(aiModelService.answerWithContext(any(), any()))
             .thenReturn(new ChatbotOutput("Tra loi", 88.0, "stub-model"));
 
         ChatbotAskRequest request = new ChatbotAskRequest(2L, "Hoi gi do", Map.of("module", "DOCUMENT"));
         aiApplicationService.askChatbot(request);
 
-        var order = inOrder(embeddingService, aiDocumentChunkRepository, aiModelService);
+        var order = inOrder(embeddingService, vectorSearchService, aiModelService);
         order.verify(embeddingService).generateEmbedding("Hoi gi do");
-        order.verify(aiDocumentChunkRepository).findAll();
+        order.verify(vectorSearchService).findTopKBySimilarity(anyList(), isNull(), anyInt());
         order.verify(aiModelService).answerWithContext(any(), any());
         verify(aiResultRepository).save(resultCaptor.capture());
         assertThat(resultCaptor.getValue().getLoaiXuLyAI()).isEqualTo(AiProcessType.CHATBOT);
@@ -167,5 +168,13 @@ class AiApplicationServiceTest {
             .isInstanceOf(AppException.class)
             .extracting("errorCode")
             .isEqualTo(ErrorCode.INVALID_FILE_FORMAT);
+    }
+
+    @Test
+    void shouldSplitLongTextIntoMultipleChunksWithOverlap() {
+        String longText = "Câu một hoàn chỉnh. ".repeat(30);
+        List<String> chunks = aiApplicationService.splitToChunks(longText, 500, 80);
+        assertThat(chunks.size()).isGreaterThan(1);
+        chunks.forEach(c -> assertThat(c).isNotBlank());
     }
 }

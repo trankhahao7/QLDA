@@ -8,9 +8,9 @@ import com.qlda.aiservice.dto.request.ChatbotAskRequest;
 import com.qlda.aiservice.entity.AiDocumentChunkEntity;
 import com.qlda.aiservice.entity.AiProcessType;
 import com.qlda.aiservice.entity.AiResultEntity;
-import com.qlda.aiservice.repository.AiDocumentChunkRepository;
 import com.qlda.aiservice.repository.AiResultRepository;
 import com.qlda.aiservice.service.EmbeddingService;
+import com.qlda.aiservice.service.VectorSearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,12 +26,13 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,10 +42,10 @@ class ChatbotServiceTest {
     private AiResultRepository aiResultRepository;
 
     @Mock
-    private AiDocumentChunkRepository aiDocumentChunkRepository;
+    private EmbeddingService embeddingService;
 
     @Mock
-    private EmbeddingService embeddingService;
+    private VectorSearchService vectorSearchService;
 
     @Mock
     private ChatbotLlmService chatbotLlmService;
@@ -67,8 +68,8 @@ class ChatbotServiceTest {
     void setUp() {
         chatbotService = new ChatbotService(
             aiResultRepository,
-            aiDocumentChunkRepository,
             embeddingService,
+            vectorSearchService,
             chatbotLlmService,
             documentInternalApiService,
             workflowInternalApiService,
@@ -87,11 +88,10 @@ class ChatbotServiceTest {
     }
 
     @Test
-    void shouldUseEmbeddingAndChunkSearchForDocumentSearch() {
+    void shouldUseEmbeddingAndVectorSearchForDocumentSearch() {
         when(embeddingService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
-        when(aiDocumentChunkRepository.findAll()).thenReturn(List.of(
-            chunk(10L, 1L, "Nội dung tài liệu đào tạo", "{\"type\":\"DOCUMENT\"}", "[1.0,0.0]")
-        ));
+        when(vectorSearchService.findTopKBySimilarity(anyList(), anyLong(), anyInt()))
+            .thenReturn(List.of(chunk(10L, 1L, "Nội dung tài liệu đào tạo", "{\"type\":\"DOCUMENT\"}", "[1.0,0.0]")));
         when(documentInternalApiService.checkDocumentAccess(2L, List.of(1L))).thenReturn(Set.of(1L));
         when(chatbotLlmService.generateAnswer(anyString(), anyString(), anyString()))
             .thenReturn(new ChatbotLlmResponse("Đã tìm thấy tài liệu phù hợp.", 91.0, "stub-model"));
@@ -102,8 +102,9 @@ class ChatbotServiceTest {
             Map.of("module", "DOCUMENT", "documentId", 1L)
         ));
 
-        verify(embeddingService).generateEmbedding("Tìm tài liệu về đào tạo người dùng");
-        verify(aiDocumentChunkRepository).findAll();
+        var order = inOrder(embeddingService, vectorSearchService);
+        order.verify(embeddingService).generateEmbedding("Tìm tài liệu về đào tạo người dùng");
+        order.verify(vectorSearchService).findTopKBySimilarity(anyList(), anyLong(), anyInt());
         verify(documentInternalApiService).checkDocumentAccess(2L, List.of(1L));
         verify(aiResultRepository).save(aiResultCaptor.capture());
         assertThat(aiResultCaptor.getValue().getLoaiXuLyAI()).isEqualTo(AiProcessType.CHATBOT);
@@ -118,9 +119,7 @@ class ChatbotServiceTest {
             .thenReturn(new ChatbotLlmResponse("Bạn đã upload 12 văn bản.", 96.0, "stub-model"));
 
         Map<String, Object> response = chatbotService.ask(new ChatbotAskRequest(
-            2L,
-            "Tôi đã upload bao nhiêu văn bản?",
-            null
+            2L, "Tôi đã upload bao nhiêu văn bản?", null
         ));
 
         verify(documentInternalApiService).getMyUploadedDocumentCount(2L);
@@ -138,9 +137,7 @@ class ChatbotServiceTest {
             .thenReturn(new ChatbotLlmResponse("Bạn có 5 văn bản sắp hết hạn.", 95.0, "stub-model"));
 
         Map<String, Object> response = chatbotService.ask(new ChatbotAskRequest(
-            2L,
-            "Tôi có bao nhiêu văn bản sắp hết hạn?",
-            null
+            2L, "Tôi có bao nhiêu văn bản sắp hết hạn?", null
         ));
 
         verify(workflowInternalApiService).getMyDueSoonDocumentCount(2L, 3);
@@ -155,11 +152,7 @@ class ChatbotServiceTest {
         when(chatbotLlmService.generateAnswer(anyString(), anyString(), anyString()))
             .thenReturn(new ChatbotLlmResponse("Hệ thống có 120 người dùng.", 97.0, "stub-model"));
 
-        chatbotService.ask(new ChatbotAskRequest(
-            2L,
-            "Hệ thống có bao nhiêu người dùng?",
-            null
-        ));
+        chatbotService.ask(new ChatbotAskRequest(2L, "Hệ thống có bao nhiêu người dùng?", null));
 
         var order = inOrder(authInternalApiService);
         order.verify(authInternalApiService).hasSystemStatisticPermission(2L);
@@ -167,21 +160,20 @@ class ChatbotServiceTest {
     }
 
     @Test
-    void shouldFilterUserGuideChunksByMetadataType() {
+    void shouldUseUserGuideVectorSearchForUserGuideIntent() {
         when(embeddingService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
-        when(aiDocumentChunkRepository.findAll()).thenReturn(List.of(
-            chunk(20L, 8L, "Hướng dẫn tạo văn bản đến", "{\"type\":\"huong_dan\"}", "[1.0,0.0]"),
-            chunk(21L, 9L, "Nội dung văn bản nghiệp vụ", "{\"type\":\"DOCUMENT\"}", "[1.0,0.0]")
-        ));
+        when(vectorSearchService.findTopKUserGuide(anyList(), anyInt()))
+            .thenReturn(List.of(
+                chunk(20L, 8L, "Hướng dẫn tạo văn bản đến", "{\"type\":\"huong_dan\"}", "[1.0,0.0]")
+            ));
         when(chatbotLlmService.generateAnswer(anyString(), anyString(), anyString()))
             .thenReturn(new ChatbotLlmResponse("Vào menu Văn bản đến, chọn Tạo mới.", 90.0, "stub-model"));
 
         Map<String, Object> response = chatbotService.ask(new ChatbotAskRequest(
-            2L,
-            "lam sao tao van ban den",
-            Map.of("module", "DOCUMENT")
+            2L, "lam sao tao van ban den", Map.of("module", "DOCUMENT")
         ));
 
+        verify(vectorSearchService).findTopKUserGuide(anyList(), anyInt());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sources = (List<Map<String, Object>>) response.get("sources");
         assertThat(sources).hasSize(1);
@@ -191,17 +183,31 @@ class ChatbotServiceTest {
     }
 
     @Test
-    void shouldReturnSafeAnswerForGeneralHelpWithoutFabrication() {
+    void shouldCallLlmForGeneralHelp() {
+        when(chatbotLlmService.generateAnswer(anyString(), anyString(), anyString()))
+            .thenReturn(new ChatbotLlmResponse("Chào bạn! Tôi có thể giúp gì?", 90.0, "gemini-2.5-flash"));
+
         Map<String, Object> response = chatbotService.ask(new ChatbotAskRequest(
-            2L,
-            "Xin chào",
-            null
+            2L, "Xin chào", null
         ));
 
-        verifyNoInteractions(chatbotLlmService);
+        verify(chatbotLlmService).generateAnswer(anyString(), anyString(), anyString());
         assertThat(response.get("intent")).isEqualTo("GENERAL_HELP");
-        assertThat(response.get("answer")).isEqualTo("Không tìm thấy dữ liệu phù hợp.");
         assertThat(response.get("resultId")).isEqualTo(99L);
+    }
+
+    @Test
+    void shouldReturnNoDataWhenDocumentSearchHasNoAccessibleChunks() {
+        when(embeddingService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
+        when(vectorSearchService.findTopKBySimilarity(anyList(), isNull(), anyInt()))
+            .thenReturn(List.of());
+
+        Map<String, Object> response = chatbotService.ask(new ChatbotAskRequest(
+            2L, "Tìm tài liệu không tồn tại", null
+        ));
+
+        assertThat(response.get("intent")).isEqualTo("DOCUMENT_SEARCH");
+        assertThat(response.get("answer")).isEqualTo("Không tìm thấy dữ liệu phù hợp.");
     }
 
     private AiDocumentChunkEntity chunk(Long chunkId, Long documentId, String content, String metadata, String embedding) {

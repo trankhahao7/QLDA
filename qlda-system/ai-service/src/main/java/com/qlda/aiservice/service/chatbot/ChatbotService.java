@@ -11,21 +11,18 @@ import com.qlda.aiservice.entity.AiProcessType;
 import com.qlda.aiservice.entity.AiResultEntity;
 import com.qlda.aiservice.exception.AppException;
 import com.qlda.aiservice.exception.ErrorCode;
-import com.qlda.aiservice.repository.AiDocumentChunkRepository;
 import com.qlda.aiservice.repository.AiResultRepository;
 import com.qlda.aiservice.service.EmbeddingService;
+import com.qlda.aiservice.service.VectorSearchService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -35,8 +32,8 @@ public class ChatbotService {
     private static final int DUE_SOON_DAYS = 3;
 
     private final AiResultRepository aiResultRepository;
-    private final AiDocumentChunkRepository aiDocumentChunkRepository;
     private final EmbeddingService embeddingService;
+    private final VectorSearchService vectorSearchService;
     private final ChatbotLlmService chatbotLlmService;
     private final DocumentInternalApiService documentInternalApiService;
     private final WorkflowInternalApiService workflowInternalApiService;
@@ -49,8 +46,8 @@ public class ChatbotService {
 
     public ChatbotService(
         AiResultRepository aiResultRepository,
-        AiDocumentChunkRepository aiDocumentChunkRepository,
         EmbeddingService embeddingService,
+        VectorSearchService vectorSearchService,
         ChatbotLlmService chatbotLlmService,
         DocumentInternalApiService documentInternalApiService,
         WorkflowInternalApiService workflowInternalApiService,
@@ -62,8 +59,8 @@ public class ChatbotService {
         @Value("${CHATBOT_TOP_K:5}") int topK
     ) {
         this.aiResultRepository = aiResultRepository;
-        this.aiDocumentChunkRepository = aiDocumentChunkRepository;
         this.embeddingService = embeddingService;
+        this.vectorSearchService = vectorSearchService;
         this.chatbotLlmService = chatbotLlmService;
         this.documentInternalApiService = documentInternalApiService;
         this.workflowInternalApiService = workflowInternalApiService;
@@ -108,60 +105,50 @@ public class ChatbotService {
     private ChatbotExecution processDocumentSearch(ChatbotAskRequest request) {
         List<Double> queryEmbedding = embeddingService.generateEmbedding(request.question());
         Long contextDocumentId = extractDocumentId(request.context());
-        List<RankedChunk> rankedChunks = rankChunks(queryEmbedding, contextDocumentId);
-        List<RankedChunk> accessibleChunks = filterByAccess(request.userId(), contextDocumentId, rankedChunks);
-        List<RankedChunk> topChunks = accessibleChunks.stream().limit(topK).toList();
+
+        List<AiDocumentChunkEntity> rankedChunks = vectorSearchService.findTopKBySimilarity(
+            queryEmbedding, contextDocumentId, topK * 3
+        );
+        List<AiDocumentChunkEntity> accessibleChunks = filterByAccess(request.userId(), contextDocumentId, rankedChunks);
+        List<AiDocumentChunkEntity> topChunks = accessibleChunks.stream().limit(topK).toList();
 
         if (topChunks.isEmpty()) {
             return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
         }
 
         String retrievedDocuments = topChunks.stream()
-            .map(item -> item.chunk().getNoiDung())
+            .map(AiDocumentChunkEntity::getNoiDung)
             .reduce("", (a, b) -> a + "\n" + b)
             .trim();
         String userPrompt = chatbotPromptBuilder.buildDocumentSearchPrompt(request.question(), retrievedDocuments);
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
-            chatbotPromptBuilder.systemPrompt(),
-            userPrompt,
-            request.question()
+            chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
         return new ChatbotExecution(
-            llmResponse.answer(),
-            null,
-            mapSources(topChunks),
-            llmResponse.modelUsed(),
-            llmResponse.confidence()
+            llmResponse.answer(), null, mapSources(topChunks),
+            llmResponse.modelUsed(), llmResponse.confidence()
         );
     }
 
     private ChatbotExecution processUserGuide(ChatbotAskRequest request) {
         List<Double> queryEmbedding = embeddingService.generateEmbedding(request.question());
-        List<RankedChunk> rankedChunks = rankChunks(queryEmbedding, null).stream()
-            .filter(item -> isUserGuide(item.chunk()))
-            .limit(topK)
-            .toList();
+        List<AiDocumentChunkEntity> rankedChunks = vectorSearchService.findTopKUserGuide(queryEmbedding, topK);
 
         if (rankedChunks.isEmpty()) {
             return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
         }
 
         String guideContext = rankedChunks.stream()
-            .map(item -> item.chunk().getNoiDung())
+            .map(AiDocumentChunkEntity::getNoiDung)
             .reduce("", (a, b) -> a + "\n" + b)
             .trim();
         String userPrompt = chatbotPromptBuilder.buildUserGuidePrompt(request.question(), guideContext);
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
-            chatbotPromptBuilder.systemPrompt(),
-            userPrompt,
-            request.question()
+            chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
         return new ChatbotExecution(
-            llmResponse.answer(),
-            null,
-            mapSources(rankedChunks),
-            llmResponse.modelUsed(),
-            llmResponse.confidence()
+            llmResponse.answer(), null, mapSources(rankedChunks),
+            llmResponse.modelUsed(), llmResponse.confidence()
         );
     }
 
@@ -171,13 +158,7 @@ public class ChatbotService {
             chatbotPromptBuilder.buildGeneralHelpPrompt(request.question()),
             request.question()
         );
-        return new ChatbotExecution(
-            llmResponse.answer(),
-            null,
-            List.of(),
-            llmResponse.modelUsed(),
-            llmResponse.confidence()
-        );
+        return new ChatbotExecution(llmResponse.answer(), null, List.of(), llmResponse.modelUsed(), llmResponse.confidence());
     }
 
     private ChatbotExecution processSystemStatistic(ChatbotAskRequest request, ChatbotMetricCode metricCode) {
@@ -193,17 +174,9 @@ public class ChatbotService {
         };
         String userPrompt = chatbotPromptBuilder.buildStatisticPrompt(request.question(), metricCode, value);
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
-            chatbotPromptBuilder.systemPrompt(),
-            userPrompt,
-            request.question()
+            chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
-        return new ChatbotExecution(
-            llmResponse.answer(),
-            value,
-            List.of(),
-            llmResponse.modelUsed(),
-            llmResponse.confidence()
-        );
+        return new ChatbotExecution(llmResponse.answer(), value, List.of(), llmResponse.modelUsed(), llmResponse.confidence());
     }
 
     private long getTotalUserCountWithPermissionCheck(Long userId) {
@@ -213,76 +186,52 @@ public class ChatbotService {
         return authInternalApiService.getTotalUserCount(userId);
     }
 
-    private List<RankedChunk> rankChunks(List<Double> queryEmbedding, Long contextDocumentId) {
-        return aiDocumentChunkRepository.findAll().stream()
-            .filter(chunk -> contextDocumentId == null || Objects.equals(chunk.getVanBanId(), contextDocumentId))
-            .map(chunk -> new RankedChunk(chunk, cosineSimilarity(queryEmbedding, fromJsonVector(chunk.getEmbedding()))))
-            .sorted(Comparator.comparingDouble(RankedChunk::score).reversed())
-            .toList();
-    }
+    private List<AiDocumentChunkEntity> filterByAccess(Long userId, Long contextDocumentId, List<AiDocumentChunkEntity> chunks) {
+        LinkedHashMap<Long, Boolean> docIds = new LinkedHashMap<>();
+        for (AiDocumentChunkEntity chunk : chunks) {
+            if (chunk.getVanBanId() != null) docIds.put(chunk.getVanBanId(), true);
+        }
+        if (contextDocumentId != null) docIds.put(contextDocumentId, true);
+        if (docIds.isEmpty()) return chunks;
 
-    private List<RankedChunk> filterByAccess(Long userId, Long contextDocumentId, List<RankedChunk> rankedChunks) {
-        LinkedHashSet<Long> documentIds = new LinkedHashSet<>();
-        for (RankedChunk rankedChunk : rankedChunks) {
-            if (rankedChunk.chunk().getVanBanId() != null) {
-                documentIds.add(rankedChunk.chunk().getVanBanId());
-            }
-        }
-        if (contextDocumentId != null) {
-            documentIds.add(contextDocumentId);
-        }
-        if (documentIds.isEmpty()) {
-            return rankedChunks;
-        }
         try {
-            Set<Long> allowedDocumentIds = documentInternalApiService.checkDocumentAccess(userId, new ArrayList<>(documentIds));
-            return rankedChunks.stream()
-                .filter(item -> allowedDocumentIds.contains(item.chunk().getVanBanId()))
+            Set<Long> allowed = documentInternalApiService.checkDocumentAccess(
+                userId, new ArrayList<>(docIds.keySet())
+            );
+            return chunks.stream()
+                .filter(c -> allowed.contains(c.getVanBanId()))
                 .toList();
         } catch (Exception ex) {
-            return rankedChunks;
+            return chunks;
         }
     }
 
-    private List<Map<String, Object>> mapSources(List<RankedChunk> rankedChunks) {
+    private List<Map<String, Object>> mapSources(List<AiDocumentChunkEntity> chunks) {
         List<Map<String, Object>> sources = new ArrayList<>();
-        for (RankedChunk item : rankedChunks) {
+        for (AiDocumentChunkEntity chunk : chunks) {
             Map<String, Object> source = new LinkedHashMap<>();
-            source.put("documentId", item.chunk().getVanBanId());
-            source.put("chunkId", item.chunk().getId());
-            source.put("score", item.score());
-            source.put("matchedText", item.chunk().getNoiDung());
-            Map<String, Object> metadata = fromJsonMap(item.chunk().getMetadata());
+            source.put("documentId", chunk.getVanBanId());
+            source.put("chunkId", chunk.getId());
+            source.put("matchedText", chunk.getNoiDung());
+            Map<String, Object> metadata = fromJsonMap(chunk.getMetadata());
             Object title = metadata.get("title") != null ? metadata.get("title") : metadata.get("trichYeu");
-            if (title != null) {
-                source.put("title", title);
-            }
-            Object reference = metadata.get("type");
-            source.put("reference", reference == null ? "DOCUMENT" : String.valueOf(reference));
+            if (title != null) source.put("title", title);
+            Object type = metadata.get("type");
+            source.put("reference", type == null ? "DOCUMENT" : String.valueOf(type));
             sources.add(source);
         }
         return sources;
     }
 
-    private boolean isUserGuide(AiDocumentChunkEntity chunk) {
-        Map<String, Object> metadata = fromJsonMap(chunk.getMetadata());
-        Object type = metadata.get("type");
-        if (type == null) {
-            return false;
-        }
-        String value = String.valueOf(type).trim();
-        return value.equalsIgnoreCase("huong_dan");
-    }
-
-    private AiResultEntity saveResult(ChatbotAskRequest request, IntentDetectionResult detectionResult, ChatbotExecution execution) {
+    private AiResultEntity saveResult(
+        ChatbotAskRequest request,
+        IntentDetectionResult detectionResult,
+        ChatbotExecution execution
+    ) {
         Map<String, Object> noteData = new LinkedHashMap<>();
         noteData.put("intent", detectionResult.intent().name());
-        if (detectionResult.metricCode() != null) {
-            noteData.put("metricCode", detectionResult.metricCode().name());
-        }
-        if (!execution.sources().isEmpty()) {
-            noteData.put("sources", execution.sources());
-        }
+        if (detectionResult.metricCode() != null) noteData.put("metricCode", detectionResult.metricCode().name());
+        if (!execution.sources().isEmpty()) noteData.put("sources", execution.sources());
 
         AiResultEntity entity = AiResultEntity.builder()
             .vanBanID(extractDocumentId(request.context()))
@@ -299,72 +248,23 @@ public class ChatbotService {
     }
 
     private String toJson(Object input) {
-        try {
-            return objectMapper.writeValueAsString(input);
-        } catch (JsonProcessingException ex) {
-            return "{}";
-        }
+        try { return objectMapper.writeValueAsString(input); }
+        catch (JsonProcessingException ex) { return "{}"; }
     }
 
     private Long extractDocumentId(Map<String, Object> context) {
-        if (context == null) {
-            return null;
-        }
+        if (context == null) return null;
         Object documentId = context.get("documentId");
-        if (documentId instanceof Number number) {
-            return number.longValue();
-        }
-        if (documentId instanceof String text && !text.isBlank()) {
-            return Long.parseLong(text);
-        }
+        if (documentId instanceof Number n) return n.longValue();
+        if (documentId instanceof String s && !s.isBlank()) return Long.parseLong(s);
         return null;
-    }
-
-    private List<Double> fromJsonVector(String json) {
-        if (json == null || json.isBlank()) {
-            return List.of();
-        }
-        try {
-            return objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, Double.class));
-        } catch (Exception ex) {
-            return List.of();
-        }
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> fromJsonMap(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(json, Map.class);
-        } catch (Exception ex) {
-            return Map.of();
-        }
-    }
-
-    private double cosineSimilarity(List<Double> a, List<Double> b) {
-        if (a == null || b == null || a.isEmpty() || b.isEmpty()) {
-            return 0.0;
-        }
-        int size = Math.min(a.size(), b.size());
-        double dot = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-        for (int i = 0; i < size; i++) {
-            double av = a.get(i);
-            double bv = b.get(i);
-            dot += av * bv;
-            normA += av * av;
-            normB += bv * bv;
-        }
-        if (normA == 0.0 || normB == 0.0) {
-            return 0.0;
-        }
-        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-    }
-
-    private record RankedChunk(AiDocumentChunkEntity chunk, double score) {
+        if (json == null || json.isBlank()) return Map.of();
+        try { return objectMapper.readValue(json, Map.class); }
+        catch (Exception ex) { return Map.of(); }
     }
 
     private record ChatbotExecution(
@@ -373,6 +273,5 @@ public class ChatbotService {
         List<Map<String, Object>> sources,
         String modelUsed,
         double confidence
-    ) {
-    }
+    ) {}
 }

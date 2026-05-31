@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
@@ -29,6 +29,10 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +59,9 @@ class AiApplicationServiceRegressionTest {
     @Mock
     private DocumentInternalApiService documentInternalApiService;
 
+    @Mock
+    private VectorSearchService vectorSearchService;
+
     private AiApplicationService aiApplicationService;
 
     @BeforeEach
@@ -66,7 +73,8 @@ class AiApplicationServiceRegressionTest {
             embeddingService,
             ocrService,
             new ObjectMapper(),
-            documentInternalApiService
+            documentInternalApiService,
+            vectorSearchService
         );
 
         when(aiResultRepository.save(any())).thenAnswer(invocation -> {
@@ -77,6 +85,7 @@ class AiApplicationServiceRegressionTest {
         when(documentInternalApiService.getDocument(any())).thenReturn(
             new DocumentMetadataDto(1L, "stub", 1L, 1L, 1L, "2026-05-08T10:00:00")
         );
+        when(vectorSearchService.toVectorString(anyList())).thenReturn("[1.0,0.0]");
     }
 
     @Test
@@ -107,11 +116,7 @@ class AiApplicationServiceRegressionTest {
         ArgumentCaptor<List<String>> categoriesCaptor = ArgumentCaptor.forClass(List.class);
         verify(aiModelService).classify(any(), categoriesCaptor.capture(), any());
         assertThat(categoriesCaptor.getValue()).containsExactly(
-            "CONG_VAN",
-            "QUYET_DINH",
-            "THONG_BAO",
-            "KE_HOACH",
-            "BAO_CAO"
+            "CONG_VAN", "QUYET_DINH", "THONG_BAO", "KE_HOACH", "BAO_CAO"
         );
     }
 
@@ -127,37 +132,21 @@ class AiApplicationServiceRegressionTest {
         ArgumentCaptor<List<String>> fieldsCaptor = ArgumentCaptor.forClass(List.class);
         verify(aiModelService).extractMetadata(any(), fieldsCaptor.capture(), any());
         assertThat(fieldsCaptor.getValue()).containsExactly(
-            "soKyHieu",
-            "ngayVanBan",
-            "nguoiKy",
-            "doKhan"
+            "soKyHieu", "ngayVanBan", "nguoiKy", "doKhan"
         );
     }
 
     @Test
     void semanticSearchShouldApplyMetadataFilters() {
         when(embeddingService.generateEmbedding("office")).thenReturn(List.of(1.0, 0.0));
-        when(aiDocumentChunkRepository.findAll()).thenReturn(List.of(
-            AiDocumentChunkEntity.builder()
-                .id(1L)
-                .vanBanId(10L)
-                .chunkIndex(0)
-                .noiDung("chunk-1")
-                .embedding("[1.0,0.0]")
-                .metadata("{\"loaiVanBanId\":1}")
-                .build(),
-            AiDocumentChunkEntity.builder()
-                .id(2L)
-                .vanBanId(11L)
-                .chunkIndex(1)
-                .noiDung("chunk-2")
-                .embedding("[1.0,0.0]")
-                .metadata("{\"loaiVanBanId\":2}")
-                .build()
-        ));
+        when(vectorSearchService.findTopKBySimilarity(anyList(), isNull(), anyInt()))
+            .thenReturn(List.of(
+                chunkWithMetadata(1L, 10L, "{\"loaiVanBanId\":1}"),
+                chunkWithMetadata(2L, 11L, "{\"loaiVanBanId\":2}")
+            ));
 
         Map<String, Object> result = aiApplicationService.semanticSearch(
-            new SemanticSearchRequest("office", 2L, Map.of("loaiVanBanId", 1), 0, 10)
+            new SemanticSearchRequest("office", null, Map.of("loaiVanBanId", 1), 0, 10)
         );
 
         List<?> content = (List<?>) result.get("content");
@@ -167,10 +156,9 @@ class AiApplicationServiceRegressionTest {
     @Test
     void semanticSearchShouldRejectInvalidDocumentIdFilter() {
         when(embeddingService.generateEmbedding("office")).thenReturn(List.of(1.0, 0.0));
-        when(aiDocumentChunkRepository.findAll()).thenReturn(List.of());
 
         assertThatThrownBy(() -> aiApplicationService.semanticSearch(
-            new SemanticSearchRequest("office", 2L, Map.of("documentId", "abc"), 0, 10)
+            new SemanticSearchRequest("office", null, Map.of("documentId", "abc"), 0, 10)
         )).isInstanceOf(AppException.class);
     }
 
@@ -179,15 +167,12 @@ class AiApplicationServiceRegressionTest {
         when(embeddingService.generateEmbedding(any())).thenReturn(List.of(1.0, 0.0));
 
         aiApplicationService.indexDocument(new IndexDocumentRequest(
-            100L,
-            null,
-            "A".repeat(800),
-            Map.of("loaiVanBanId", 1)
+            100L, null, "A".repeat(800), Map.of("loaiVanBanId", 1)
         ));
 
-        var order = inOrder(aiDocumentChunkRepository);
+        var order = inOrder(aiDocumentChunkRepository, vectorSearchService);
         order.verify(aiDocumentChunkRepository).deleteByVanBanId(100L);
-        order.verify(aiDocumentChunkRepository).saveAll(any());
+        order.verify(vectorSearchService).insertChunks(any());
     }
 
     @Test
@@ -204,5 +189,12 @@ class AiApplicationServiceRegressionTest {
 
         assertThatThrownBy(() -> aiApplicationService.classify(request))
             .isInstanceOf(AppException.class);
+    }
+
+    private AiDocumentChunkEntity chunkWithMetadata(Long id, Long docId, String metadata) {
+        return AiDocumentChunkEntity.builder()
+            .id(id).vanBanId(docId).chunkIndex(0)
+            .noiDung("chunk-" + id).embedding("[1.0,0.0]").metadata(metadata)
+            .build();
     }
 }

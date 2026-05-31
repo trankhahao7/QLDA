@@ -1,11 +1,13 @@
 package com.qlda.aiservice.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@ConditionalOnMissingBean(GeminiEmbeddingService.class)
 public class StubEmbeddingService implements EmbeddingService {
 
     @Override
