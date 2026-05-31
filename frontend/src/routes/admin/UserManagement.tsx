@@ -180,7 +180,7 @@ export default function UserManagement() {
         >
           + Thêm người dùng
         </button>
-      </span></div>
+      </div>
 
       <div className="admin-filters">
         <input

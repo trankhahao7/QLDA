@@ -122,7 +122,7 @@ export default function DocumentTypeManagement() {
 
   if (error) {
     return (
-      <div className="admin-loading">{error}</span></div>
+      <div className="admin-loading">{error}</div>
     );
   }
 
