@@ -1,6 +1,6 @@
 -- =============================================
 -- QLDA Seed Data
--- TK1: icetruong (102230222@sv1.dut.udn.vn) — Chuyên viên (USER)
+-- TK1: icetruong (102230222@sv1.dut.udn.vn) — Chuyên viên (CHUYEN_VIEN)
 -- TK2: admin    (102230238@sv1.dut.udn.vn)  — Quản trị viên (ADMIN)
 -- =============================================
 
@@ -26,8 +26,8 @@ INSERT INTO donvi (id, madonvi, tendonvi, donvichaid, dienthoai, email, diachi, 
 -- =========================
 INSERT INTO nhomquyen (id, manhomquyen, tennhomquyen, mota, sudung) VALUES
 (1, 'ADMIN',   'Quản trị hệ thống', 'Toàn quyền quản trị và cấu hình hệ thống', TRUE),
-(2, 'MANAGER', 'Trưởng đơn vị',     'Quản lý đơn vị, phê duyệt văn bản',        TRUE),
-(3, 'USER',    'Chuyên viên',        'Xử lý văn bản thông thường',               TRUE);
+(2, 'LANH_DAO',    'Trưởng đơn vị', 'Quản lý đơn vị, phê duyệt văn bản',  TRUE),
+(3, 'CHUYEN_VIEN', 'Chuyên viên',   'Xử lý văn bản thông thường',             TRUE);
 
 -- =========================
 -- 3. CHỨC NĂNG
