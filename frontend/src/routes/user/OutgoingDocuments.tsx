@@ -167,6 +167,7 @@ export default function OutgoingDocuments() {
           </div>
         )}
         {documents.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -181,8 +182,19 @@ export default function OutgoingDocuments() {
                   <tr key={doc.id}>
                     <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{doc.soKyHieu || "-"}</td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{doc.tenLoaiVanBan || "-"}</td>
-                    <td>
-                      <Link to={`/documents/${doc.id}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                    <td style={{ maxWidth: 260 }}>
+                      <Link
+                        to={`/documents/${doc.id}`}
+                        title={doc.trichYeu}
+                        style={{
+                          color: "var(--accent-strong)",
+                          fontWeight: 500,
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {doc.trichYeu}
                       </Link>
                     </td>
@@ -198,6 +210,7 @@ export default function OutgoingDocuments() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

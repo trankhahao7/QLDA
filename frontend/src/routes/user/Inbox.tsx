@@ -237,6 +237,7 @@ export default function Inbox() {
         )}
 
         {documents.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -268,8 +269,19 @@ export default function Inbox() {
                     </td>
                     <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
-                    <td>
-                      <Link to={`/documents/${item.id}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                    <td style={{ maxWidth: 260 }}>
+                      <Link
+                        to={`/documents/${item.id}`}
+                        title={item.trichYeu}
+                        style={{
+                          color: "var(--accent-strong)",
+                          fontWeight: 500,
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {item.trichYeu}
                       </Link>
                     </td>
@@ -299,6 +311,7 @@ export default function Inbox() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

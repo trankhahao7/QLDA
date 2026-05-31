@@ -126,6 +126,7 @@
 .admin-main-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   display: flex;
   flex-direction: column;
   min-width: 0;

@@ -143,6 +143,7 @@ export default function Approvals() {
         )}
 
         {items.length > 0 && (
+          <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
               <tr>
@@ -162,8 +163,19 @@ export default function Approvals() {
                 return (
                   <tr key={item.processingId}>
                     <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu || "-"}</td>
-                    <td>
-                      <Link to={`/documents/${item.documentId}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                    <td style={{ maxWidth: 260 }}>
+                      <Link
+                        to={`/documents/${item.documentId}`}
+                        title={item.trichYeu}
+                        style={{
+                          color: "var(--accent-strong)",
+                          fontWeight: 500,
+                          display: "block",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {item.trichYeu}
                       </Link>
                     </td>
@@ -194,6 +206,7 @@ export default function Approvals() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
