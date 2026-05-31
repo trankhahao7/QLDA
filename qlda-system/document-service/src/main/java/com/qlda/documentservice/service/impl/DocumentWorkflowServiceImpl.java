@@ -485,6 +485,49 @@ public class DocumentWorkflowServiceImpl implements DocumentWorkflowService {
     }
 
     @Override
+    @Transactional
+    public DocumentResponses.DocumentSimpleResponse createInternal(DocumentRequests.IncomingDocumentRequest request) {
+        VanBan vanBan = new VanBan();
+        vanBan.setPhanLoaiVanBan(DocumentConstants.PHAN_LOAI_VAN_BAN_NOI_BO);
+        applyIncomingOutgoingFields(vanBan, request.soKyHieu(), request.trichYeu(), request.loaiVanBanId(), request.donViBanHanh(),
+            request.nguoiKy(), request.ngayVanBan(), request.ngayTiepNhan(), request.doMat(), request.doKhan(), request.donViChuTriId(),
+            request.hanXuLy(), request.trangThai());
+        vanBan.setNgayTao(LocalDateTime.now());
+        vanBan.setNgayCapNhat(LocalDateTime.now());
+        vanBan.setDaXoa(false);
+        VanBan saved = vanBanRepository.save(vanBan);
+        requestIndexDocument(saved.getId(), "create internal");
+        requestAutoClassify(saved);
+        return documentMapper.toDocumentSimpleResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DocumentResponses.DocumentListItemResponse> listInternal(
+        String keyword,
+        Integer loaiVanBanId,
+        Integer trangThai,
+        LocalDate fromDate,
+        LocalDate toDate,
+        Pageable pageable
+    ) {
+        Specification<VanBan> spec = Specification.where(VanBanSpecification.phanLoai(DocumentConstants.PHAN_LOAI_VAN_BAN_NOI_BO))
+            .and(VanBanSpecification.daXoaFalse())
+            .and(VanBanSpecification.keyword(keyword))
+            .and(VanBanSpecification.loaiVanBanId(loaiVanBanId))
+            .and(VanBanSpecification.trangThai(trangThai))
+            .and(VanBanSpecification.ngayTaoBetween(fromDate, toDate));
+        Page<VanBan> page = vanBanRepository.findAll(spec, pageable);
+        return new PageResponse<>(
+            page.getContent().stream().map(documentMapper::toDocumentListItemResponse).toList(),
+            page.getNumber(),
+            page.getSize(),
+            page.getTotalElements(),
+            page.getTotalPages()
+        );
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PageResponse<DocumentResponses.DocumentListItemResponse> listOutgoing(
         String keyword,

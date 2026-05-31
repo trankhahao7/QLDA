@@ -15,7 +15,7 @@ import lombok.Setter;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "UyQuyen")
+@Table(name = "uyquyen")
 @Getter
 @Setter
 @Builder
@@ -24,27 +24,27 @@ import java.time.LocalDate;
 public class UyQuyen {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "ID")
+    @Column(name = "id")
     private Long id;
 
-    @Column(name = "NguoiUyQuyenID", nullable = false)
+    @Column(name = "nguoiuyquyenid", nullable = false)
     private Long nguoiUyQuyenId;
 
-    @Column(name = "NguoiDuocUyQuyenID", nullable = false)
+    @Column(name = "nguoiduocuyquyenid", nullable = false)
     private Long nguoiDuocUyQuyenId;
 
-    @Column(name = "TuNgay", nullable = false)
+    @Column(name = "tungay", nullable = false)
     private LocalDate tuNgay;
 
-    @Column(name = "DenNgay", nullable = false)
+    @Column(name = "denngay", nullable = false)
     private LocalDate denNgay;
 
-    @Column(name = "PhamViUyQuyen", length = 100)
+    @Column(name = "phamviuyquyen", length = 100)
     private String phamViUyQuyen;
 
-    @Column(name = "GhiChu", columnDefinition = "TEXT")
+    @Column(name = "ghichu", columnDefinition = "TEXT")
     private String ghiChu;
 
-    @Column(name = "Active", nullable = false)
+    @Column(name = "active", nullable = false)
     private Boolean active;
 }

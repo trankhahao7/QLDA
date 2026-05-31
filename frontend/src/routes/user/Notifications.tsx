@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiError } from "../../services/core/apiClient";
 import { getCurrentUser } from "../../services/auth/authApi";
 import {
@@ -36,7 +37,18 @@ function getLoaiIcon(loai?: string) {
 
 type FilterTab = "all" | "unread";
 
+function resolveNotificationPath(item: NotificationItem): string | null {
+  if (item.referenceType === "APPROVAL" || item.loaiThongBao === "APPROVAL") {
+    return item.referenceId ? `/approvals` : `/approvals`;
+  }
+  if (item.referenceType === "DOCUMENT" || item.loaiThongBao === "TRANSFER" || item.loaiThongBao === "SLA") {
+    return item.referenceId ? `/documents/${item.referenceId}` : null;
+  }
+  return null;
+}
+
 export default function Notifications() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,15 +93,17 @@ export default function Notifications() {
   };
 
   const handleMarkRead = async (item: NotificationItem) => {
-    if (item.daDoc || !currentUserId) return;
-    try {
-      await markNotificationRead(item.id, currentUserId);
-      setItems((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, daDoc: true } : n))
-      );
-    } catch {
-      // silently ignore
+    if (!currentUserId) return;
+    if (!item.daDoc) {
+      try {
+        await markNotificationRead(item.id, currentUserId);
+        setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, daDoc: true } : n)));
+      } catch {
+        // silently ignore
+      }
     }
+    const path = resolveNotificationPath(item);
+    if (path) navigate(path);
   };
 
   const handleDelete = async (e: React.MouseEvent, itemId: number) => {

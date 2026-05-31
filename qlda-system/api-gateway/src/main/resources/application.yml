@@ -37,6 +37,13 @@ spring:
               predicates:
                 - Path=/api/auth/**
 
+            - id: ai-service-actuator
+              uri: lb://ai-service
+              predicates:
+                - Path=/api/ai/health
+              filters:
+                - RewritePath=/api/ai/health, /actuator/health
+
             - id: ai-service
               uri: lb://ai-service
               predicates:

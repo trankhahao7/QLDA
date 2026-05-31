@@ -53,6 +53,17 @@ public interface DocumentWorkflowService {
 
     DocumentResponses.SubmitApprovalResponse submitOutgoingApproval(Long id, DocumentRequests.SubmitApprovalRequest request);
 
+    PageResponse<DocumentResponses.DocumentListItemResponse> listInternal(
+        String keyword,
+        Integer loaiVanBanId,
+        Integer trangThai,
+        LocalDate fromDate,
+        LocalDate toDate,
+        Pageable pageable
+    );
+
+    DocumentResponses.DocumentSimpleResponse createInternal(DocumentRequests.IncomingDocumentRequest request);
+
     PageResponse<DocumentResponses.DocumentListItemResponse> listOutgoing(
         String keyword,
         Integer loaiVanBanId,

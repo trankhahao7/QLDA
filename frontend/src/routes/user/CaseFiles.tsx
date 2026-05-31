@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../../services/core/apiClient";
 import {
-  fetchCaseFiles, createCaseFile, attachDocumentToCaseFile, deleteCaseFile,
-  type CaseFileItem,
+  fetchCaseFiles, fetchCaseFileDetail, createCaseFile, attachDocumentToCaseFile, deleteCaseFile,
+  type CaseFileItem, type CaseFileDetail,
 } from "../../services/documents/caseFilesApi";
+import { fetchWorkflowTimeline, type WorkflowTimelineItem } from "../../services/workflows/workflowTrackingApi";
 import { fetchUnits, type UnitItem } from "../../services/units/unitsApi";
 import { getCurrentUser } from "../../services/auth/authApi";
 
@@ -42,6 +43,11 @@ export default function CaseFiles() {
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachSuccess, setAttachSuccess] = useState(false);
+
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [timelineCase, setTimelineCase] = useState<CaseFileDetail | null>(null);
+  const [timeline, setTimeline] = useState<WorkflowTimelineItem[]>([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
 
   const load = (kw?: string) => {
     setLoading(true);
@@ -92,6 +98,28 @@ export default function CaseFiles() {
       setError(err instanceof ApiError ? err.message : "Xóa thất bại");
     }
   };
+
+  const openTimeline = async (item: CaseFileItem) => {
+    setTimelineCase(null);
+    setTimeline([]);
+    setLoadingTimeline(true);
+    setShowTimeline(true);
+    try {
+      const detail = await fetchCaseFileDetail(item.id);
+      setTimelineCase(detail);
+      if (detail.documents && detail.documents.length > 0) {
+        const firstDoc = detail.documents[0];
+        const tl = await fetchWorkflowTimeline(firstDoc.id);
+        setTimeline(Array.isArray(tl) ? tl : []);
+      }
+    } catch {
+      // silently ignore — show empty state
+    } finally {
+      setLoadingTimeline(false);
+    }
+  };
+
+  const closeTimeline = () => { setShowTimeline(false); setTimelineCase(null); setTimeline([]); };
 
   const openAttach = (item: CaseFileItem) => {
     setAttachTarget(item); setAttachDocId(""); setAttachError(null); setAttachSuccess(false); setShowAttach(true);
@@ -173,6 +201,7 @@ export default function CaseFiles() {
                     <td style={{ whiteSpace: "nowrap" }}><span className={badge.className}>{badge.label}</span></td>
                     <td style={{ textAlign: "center" }}>
                       <div className="action-group">
+                        <button className="btn-xs btn-xs--primary" type="button" onClick={() => openTimeline(item)}>Lịch sử</button>
                         <button className="btn-xs btn-xs--ghost" type="button" onClick={() => openAttach(item)}>Gắn VB</button>
                         <button className="btn-xs btn-xs--reject" type="button" onClick={() => handleDelete(item)}>Xóa</button>
                       </div>
@@ -227,6 +256,71 @@ export default function CaseFiles() {
               <button className="button" type="button" onClick={handleCreate} disabled={creating}>
                 {creating ? "Đang tạo..." : "Tạo hồ sơ"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTimeline && (
+        <div className="modal-overlay" onClick={closeTimeline}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header">
+              <h3>📋 Lịch sử xử lý — {timelineCase?.maHoSo ?? "..."}</h3>
+              <button className="modal-close" onClick={closeTimeline}>✕</button>
+            </div>
+            <div className="modal-body">
+              {loadingTimeline && (
+                <div className="loading-state" style={{ padding: "24px 0" }}>
+                  <div className="loading-spinner" />
+                  <p>Đang tải lịch sử...</p>
+                </div>
+              )}
+              {!loadingTimeline && timelineCase && (
+                <>
+                  <div style={{ marginBottom: 12, fontSize: 13, color: "var(--text-muted)" }}>
+                    Hồ sơ: <strong style={{ color: "var(--text)" }}>{timelineCase.tenHoSo}</strong>
+                    {timelineCase.documents && timelineCase.documents.length > 0 && (
+                      <> — VB: <strong style={{ color: "var(--accent-strong)" }}>{timelineCase.documents[0].soKyHieu || `#${timelineCase.documents[0].id}`}</strong></>
+                    )}
+                  </div>
+                  {timeline.length === 0 ? (
+                    <div className="empty-state" style={{ padding: "24px 0" }}>
+                      <div className="empty-state__icon">📋</div>
+                      <h3>Chưa có lịch sử xử lý</h3>
+                      <p>Hồ sơ này chưa có bước xử lý nào được ghi nhận.</p>
+                    </div>
+                  ) : (
+                    <div className="timeline">
+                      {timeline.map((step, idx) => (
+                        <div key={step.processingId} className="timeline-item" style={{
+                          display: "flex", gap: 12, paddingBottom: 16,
+                          borderLeft: idx < timeline.length - 1 ? "2px solid var(--border)" : "2px solid transparent",
+                          marginLeft: 8, paddingLeft: 16, position: "relative",
+                        }}>
+                          <div style={{
+                            width: 10, height: 10, borderRadius: "50%",
+                            background: step.ngayHoanThanh ? "var(--accent)" : "var(--border)",
+                            position: "absolute", left: -6, top: 4, flexShrink: 0,
+                          }} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{step.tenBuoc}</div>
+                            {step.nguoiXuLy && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Người xử lý: {step.nguoiXuLy}</div>}
+                            {step.hanhDongXuLy && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Hành động: {step.hanhDongXuLy}</div>}
+                            {step.yKienXuLy && <div style={{ fontSize: 12, marginTop: 4, fontStyle: "italic" }}>"{step.yKienXuLy}"</div>}
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+                              {step.ngayNhan ? `Nhận: ${new Date(step.ngayNhan).toLocaleString("vi-VN")}` : ""}
+                              {step.ngayHoanThanh ? ` · Hoàn thành: ${new Date(step.ngayHoanThanh).toLocaleString("vi-VN")}` : " · Chưa hoàn thành"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="button secondary" type="button" onClick={closeTimeline}>Đóng</button>
             </div>
           </div>
         </div>

@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "../../services/core/apiClient";
-import { fetchOutgoingDocuments } from "../../services/documents/documentsOutgoingApi";
-import { createOutgoingDocument } from "../../services/documents/documentsOutgoingCreateApi";
+import { fetchInternalDocuments, createInternalDocument } from "../../services/documents/internalDocumentsApi";
 import { fetchDocumentTypes, type DocumentTypeItem } from "../../services/documents/documentTypesApi";
-import { uploadAttachment } from "../../services/documents/documentsApi";
 import type { DocumentListItem } from "../../services/documents/documentsApi";
 
 const TRANG_THAI_MAP: Record<number, { label: string; className: string }> = {
   0: { label: "Nháp", className: "badge badge--ghost" },
-  1: { label: "Chờ duyệt", className: "badge badge--warning" },
-  2: { label: "Đang duyệt", className: "badge badge--info" },
+  1: { label: "Đang xử lý", className: "badge badge--info" },
+  2: { label: "Đã chuyển", className: "badge badge--warning" },
   3: { label: "Trình ký", className: "badge badge--primary" },
   4: { label: "Đã ký", className: "badge badge--success" },
   5: { label: "Đã phát hành", className: "badge badge--success" },
@@ -30,16 +28,14 @@ function getTrangThaiBadge(trangThai?: number) {
 
 type CreateForm = {
   trichYeu: string; soKyHieu: string; loaiVanBanId: string;
-  nguoiKy: string; ngayVanBan: string; doKhan: string;
+  nguoiKy: string; ngayVanBan: string; doKhan: string; doMat: string;
 };
 
 const EMPTY_FORM: CreateForm = {
-  trichYeu: "", soKyHieu: "", loaiVanBanId: "", nguoiKy: "", ngayVanBan: "", doKhan: "BINH_THUONG",
+  trichYeu: "", soKyHieu: "", loaiVanBanId: "", nguoiKy: "", ngayVanBan: "", doKhan: "BINH_THUONG", doMat: "NOI_BO",
 };
 
-type UploadStatus = { file: File; status: "pending" | "uploading" | "done" | "error"; error?: string };
-
-export default function OutgoingDocuments() {
+export default function InternalDocuments() {
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,18 +46,17 @@ export default function OutgoingDocuments() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState(false);
-  const [attachFiles, setAttachFiles] = useState<UploadStatus[]>([]);
 
-  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
 
   const load = (status?: number, from?: string, to?: string) => {
     setLoading(true);
     setError(null);
-    fetchOutgoingDocuments({ page: 0, size: 50, trangThai: status, fromDate: from, toDate: to })
+    fetchInternalDocuments({ page: 0, size: 50, trangThai: status, fromDate: from, toDate: to })
       .then((res) => setDocuments(res.content || []))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Không thể tải văn bản đi"))
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Không thể tải văn bản nội bộ"))
       .finally(() => setLoading(false));
   };
 
@@ -79,49 +74,26 @@ export default function OutgoingDocuments() {
   };
 
   const openCreate = () => {
-    setForm(EMPTY_FORM); setCreateError(null); setCreateSuccess(false); setAttachFiles([]); setShowCreate(true);
+    setForm(EMPTY_FORM); setCreateError(null); setCreateSuccess(false); setShowCreate(true);
   };
 
   const closeCreate = () => {
-    setShowCreate(false); setCreateError(null); setCreateSuccess(false); setAttachFiles([]);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    setAttachFiles((prev) => [
-      ...prev,
-      ...files.map((f) => ({ file: f, status: "pending" as const })),
-    ]);
-    e.target.value = "";
-  };
-
-  const removeFile = (idx: number) => {
-    setAttachFiles((prev) => prev.filter((_, i) => i !== idx));
+    setShowCreate(false); setCreateError(null); setCreateSuccess(false);
   };
 
   const handleCreate = async () => {
     if (!form.trichYeu.trim()) { setCreateError("Vui lòng nhập trích yếu nội dung"); return; }
     setCreating(true); setCreateError(null);
     try {
-      const created = await createOutgoingDocument({
+      await createInternalDocument({
         trichYeu: form.trichYeu.trim(),
         soKyHieu: form.soKyHieu.trim() || undefined,
         loaiVanBanId: form.loaiVanBanId ? parseInt(form.loaiVanBanId, 10) : undefined,
         nguoiKy: form.nguoiKy.trim() || undefined,
         ngayVanBan: form.ngayVanBan || undefined,
         doKhan: form.doKhan || undefined,
+        doMat: form.doMat || undefined,
       });
-      if (attachFiles.length > 0 && created?.id) {
-        for (let i = 0; i < attachFiles.length; i++) {
-          setAttachFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: "uploading" } : f));
-          try {
-            await uploadAttachment(created.id, attachFiles[i].file);
-            setAttachFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: "done" } : f));
-          } catch {
-            setAttachFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, status: "error", error: "Tải lên thất bại" } : f));
-          }
-        }
-      }
       setCreateSuccess(true);
       setTimeout(() => { closeCreate(); load(); }, 900);
     } catch (err) {
@@ -131,32 +103,15 @@ export default function OutgoingDocuments() {
     }
   };
 
-  const exportCsv = () => {
-    const headers = ["Mã", "Loại", "Nội dung", "Ngày văn bản", "Trạng thái"];
-    const rows = documents.map((d) => [
-      d.soKyHieu || "-", d.tenLoaiVanBan || "-",
-      `"${(d.trichYeu || "").replace(/"/g, '""')}"`,
-      d.ngayTiepNhan ? new Date(d.ngayTiepNhan).toLocaleDateString("vi-VN") : "-",
-      getTrangThaiBadge(d.trangThai).label,
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `van-ban-di_${new Date().toISOString().split("T")[0]}.csv`; a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <section>
       <div className="topbar">
         <div className="topbar__title">
-          <h1>Văn bản đi</h1>
-          <p>Quản lý và theo dõi các văn bản ban hành.</p>
+          <h1>Văn bản nội bộ</h1>
+          <p>Quản lý văn bản lưu hành nội bộ trong đơn vị.</p>
         </div>
         <div className="topbar__actions">
-          <button className="button secondary" type="button" onClick={exportCsv}>Xuất CSV</button>
-          <button className="button" type="button" onClick={openCreate}>+ Tạo văn bản đi</button>
+          <button className="button" type="button" onClick={openCreate}>+ Tạo văn bản nội bộ</button>
         </div>
       </div>
 
@@ -184,60 +139,62 @@ export default function OutgoingDocuments() {
         {loading && (
           <div className="loading-state">
             <div className="loading-spinner" />
-            <p>Đang tải văn bản đi...</p>
+            <p>Đang tải văn bản nội bộ...</p>
           </div>
         )}
         {!loading && !error && documents.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state__icon">📤</div>
-            <h3>Chưa có văn bản đi</h3>
-            <p>Tạo văn bản đi đầu tiên bằng nút phía trên.</p>
+            <div className="empty-state__icon">🏢</div>
+            <h3>Chưa có văn bản nội bộ</h3>
+            <p>Tạo văn bản nội bộ đầu tiên bằng nút phía trên.</p>
           </div>
         )}
         {documents.length > 0 && (
           <div style={{ overflowX: "auto" }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Mã</th><th>Loại</th><th>Nội dung</th><th>Ngày</th><th>Ưu tiên</th><th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documents.map((doc) => {
-                const stt = getTrangThaiBadge(doc.trangThai);
-                const khan = doc.doKhan ? (DO_KHAN_MAP[doc.doKhan] ?? null) : null;
-                return (
-                  <tr key={doc.id}>
-                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{doc.soKyHieu || "-"}</td>
-                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{doc.tenLoaiVanBan || "-"}</td>
-                    <td style={{ maxWidth: 260 }}>
-                      <Link
-                        to={`/documents/${doc.id}`}
-                        title={doc.trichYeu}
-                        style={{
-                          color: "var(--accent-strong)",
-                          fontWeight: 500,
-                          display: "block",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {doc.trichYeu}
-                      </Link>
-                    </td>
-                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-                      {doc.ngayTiepNhan ? new Date(doc.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {khan ? <span className={khan.className}>{khan.label}</span> : <span className="badge badge--ghost">—</span>}
-                    </td>
-                    <td style={{ whiteSpace: "nowrap" }}><span className={stt.className}>{stt.label}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Mã</th><th>Loại</th><th>Nội dung</th><th>Ngày tạo</th><th>Ưu tiên</th><th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {documents.map((doc) => {
+                  const stt = getTrangThaiBadge(doc.trangThai);
+                  const khan = doc.doKhan ? (DO_KHAN_MAP[doc.doKhan] ?? null) : null;
+                  return (
+                    <tr key={doc.id}>
+                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{doc.soKyHieu || "-"}</td>
+                      <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{doc.tenLoaiVanBan || "-"}</td>
+                      <td style={{ maxWidth: 280 }}>
+                        <Link
+                          to={`/documents/${doc.id}`}
+                          title={doc.trichYeu}
+                          style={{
+                            color: "var(--accent-strong)",
+                            fontWeight: 500,
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {doc.trichYeu}
+                        </Link>
+                      </td>
+                      <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+                        {doc.ngayTiepNhan ? new Date(doc.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {khan ? <span className={khan.className}>{khan.label}</span> : <span className="badge badge--ghost">—</span>}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <span className={stt.className}>{stt.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -246,20 +203,20 @@ export default function OutgoingDocuments() {
         <div className="modal-overlay" onClick={closeCreate}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>📝 Tạo văn bản đi mới</h3>
+              <h3>🏢 Tạo văn bản nội bộ</h3>
               <button className="modal-close" onClick={closeCreate}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-section">
                 <div className="form-field">
                   <label className="form-label">Trích yếu nội dung <span>*</span></label>
-                  <textarea className="form-control" rows={3} placeholder="Nhập trích yếu nội dung văn bản..."
+                  <textarea className="form-control" rows={3} placeholder="Nhập trích yếu nội dung..."
                     value={form.trichYeu} onChange={(e) => setForm({ ...form, trichYeu: e.target.value })} />
                 </div>
                 <div className="form-row">
                   <div className="form-field">
                     <label className="form-label">Số ký hiệu</label>
-                    <input type="text" className="form-control" placeholder="VD: 01/2026/QĐ-ABC"
+                    <input type="text" className="form-control" placeholder="VD: 01/TB-NB"
                       value={form.soKyHieu} onChange={(e) => setForm({ ...form, soKyHieu: e.target.value })} />
                   </div>
                   <div className="form-field">
@@ -283,35 +240,27 @@ export default function OutgoingDocuments() {
                       value={form.ngayVanBan} onChange={(e) => setForm({ ...form, ngayVanBan: e.target.value })} />
                   </div>
                 </div>
-                <div className="form-field">
-                  <label className="form-label">Độ khẩn</label>
-                  <select className="form-control" value={form.doKhan}
-                    onChange={(e) => setForm({ ...form, doKhan: e.target.value })}>
-                    <option value="BINH_THUONG">Bình thường</option>
-                    <option value="KHAN">Khẩn</option>
-                    <option value="THUONG_KHAN">Thượng khẩn</option>
-                    <option value="HOA_TOC">Hỏa tốc</option>
-                  </select>
+                <div className="form-row">
+                  <div className="form-field">
+                    <label className="form-label">Độ khẩn</label>
+                    <select className="form-control" value={form.doKhan}
+                      onChange={(e) => setForm({ ...form, doKhan: e.target.value })}>
+                      <option value="BINH_THUONG">Bình thường</option>
+                      <option value="KHAN">Khẩn</option>
+                      <option value="THUONG_KHAN">Thượng khẩn</option>
+                      <option value="HOA_TOC">Hỏa tốc</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label className="form-label">Độ mật</label>
+                    <select className="form-control" value={form.doMat}
+                      onChange={(e) => setForm({ ...form, doMat: e.target.value })}>
+                      <option value="NOI_BO">Nội bộ</option>
+                      <option value="CONG_KHAI">Công khai</option>
+                      <option value="MAT">Mật</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div className="form-field">
-                <label className="form-label">Tệp đính kèm</label>
-                <input type="file" multiple onChange={handleFileChange} style={{ fontSize: 13 }} />
-                {attachFiles.length > 0 && (
-                  <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 4 }}>
-                    {attachFiles.map((f, i) => (
-                      <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file.name}</span>
-                        <span style={{ color: f.status === "done" ? "#22c55e" : f.status === "error" ? "#ef4444" : f.status === "uploading" ? "#f59e0b" : "var(--text-muted)" }}>
-                          {f.status === "done" ? "✓" : f.status === "error" ? "✕" : f.status === "uploading" ? "..." : "chờ"}
-                        </span>
-                        {f.status === "pending" && (
-                          <button type="button" onClick={() => removeFile(i)} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12 }}>✕</button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
               {createSuccess && <div className="alert alert--success">Tạo văn bản thành công!</div>}
               {createError && <div className="alert alert--error">{createError}</div>}

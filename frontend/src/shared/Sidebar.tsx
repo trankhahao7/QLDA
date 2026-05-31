@@ -20,6 +20,7 @@ const navItems = [
   { to: "/outgoing", label: "Văn bản đi", icon: "📤" },
   { to: "/approvals", label: "Phê duyệt", icon: "✅" },
   { to: "/case-files", label: "Hồ sơ công việc", icon: "🗂️" },
+  { to: "/internal-documents", label: "Văn bản nội bộ", icon: "🏢" },
   { to: "/delegation", label: "Ủy quyền xử lý", icon: "🤝" },
   { to: "/upload", label: "Tải lên", icon: "⬆️" },
   { to: "/search", label: "Tìm kiếm", icon: "🔍" },
@@ -104,13 +105,6 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="sidebar__card">
-        <h3>Trạng thái kết nối</h3>
-        <p>Đang đồng bộ Office 365. Cập nhật lúc 09:20.</p>
-        <button className="button secondary" type="button" style={{ fontSize: 12, padding: "6px 12px" }}>
-          Xem lịch sử
-        </button>
-      </div>
     </aside>
   );
 }

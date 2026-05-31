@@ -7,6 +7,7 @@ public final class DocumentConstants {
     public static final int PHAN_LOAI_VAN_BAN_DEN = 1;
     public static final int PHAN_LOAI_VAN_BAN_DI = 2;
     public static final int PHAN_LOAI_VAN_BAN_NHAP = 3;
+    public static final int PHAN_LOAI_VAN_BAN_NOI_BO = 4;
 
     public static final int TRANG_THAI_NHAP = 0;
     public static final int TRANG_THAI_DANG_XU_LY = 1;

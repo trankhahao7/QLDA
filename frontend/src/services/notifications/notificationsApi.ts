@@ -9,6 +9,8 @@ export type NotificationItem = {
   kenhGui?: string;
   daDoc: boolean;
   ngayGui?: string;
+  referenceId?: number;
+  referenceType?: string;
 };
 
 export const fetchNotifications = (params?: {

@@ -8,6 +8,7 @@ import {
 import {
   fetchWorkflowProgress,
   fetchOverdueDocuments,
+  type WorkflowProgressTask,
 } from "../../services/reports/reportsWorkflowApi";
 import { exportReport } from "../../services/reports/reportsExportApi";
 
@@ -16,7 +17,10 @@ type WorkflowProgress = {
   completedTasks: number;
   processingTasks: number;
   overdueTasks: number;
+  items?: WorkflowProgressTask[];
 };
+
+type TopEmployee = { id: number; name: string; count: number };
 
 type OverdueItem = {
   documentId: number;
@@ -76,6 +80,7 @@ export default function Reports() {
   const [docStats, setDocStats] = useState<DocumentStatisticsItem[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowProgress | null>(null);
   const [overdue, setOverdue] = useState<OverdueItem[]>([]);
+  const [topEmployees, setTopEmployees] = useState<TopEmployee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +101,22 @@ export default function Reports() {
     ]).then(([statsRes, docRes, wfRes, overdueRes]) => {
       if (statsRes.status === "fulfilled") setStats(statsRes.value);
       if (docRes.status === "fulfilled") setDocStats(docRes.value?.items ?? []);
-      if (wfRes.status === "fulfilled") setWorkflow(wfRes.value);
+      if (wfRes.status === "fulfilled") {
+        setWorkflow(wfRes.value);
+        const items = wfRes.value?.items ?? [];
+        const countMap = new Map<number, { name: string; count: number }>();
+        items.forEach((item) => {
+          if (!item.nguoiXuLyId) return;
+          const existing = countMap.get(item.nguoiXuLyId);
+          if (existing) existing.count++;
+          else countMap.set(item.nguoiXuLyId, { name: item.nguoiXuLy ?? `#${item.nguoiXuLyId}`, count: 1 });
+        });
+        const top = Array.from(countMap.entries())
+          .map(([id, v]) => ({ id, name: v.name, count: v.count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setTopEmployees(top);
+      }
       if (overdueRes.status === "fulfilled") setOverdue(overdueRes.value?.content ?? []);
       if (statsRes.status === "rejected" && docRes.status === "rejected" && wfRes.status === "rejected") {
         setError("Không thể tải dữ liệu báo cáo");
@@ -266,6 +286,33 @@ export default function Reports() {
             <div className="card" style={{ marginBottom: 16 }}>
               <h3 style={{ marginTop: 0, marginBottom: 16 }}>Số văn bản theo tháng</h3>
               <BarChart items={docStats} maxValue={maxDocValue} />
+            </div>
+          )}
+
+          {topEmployees.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 16 }}>Top nhân viên xử lý nhiều nhất</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {topEmployees.map((emp, idx) => (
+                  <div key={emp.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 24, textAlign: "center", fontWeight: 700, fontSize: 13, color: idx < 3 ? "#f59e0b" : "var(--text-muted)" }}>
+                      {idx + 1}
+                    </div>
+                    <div style={{ width: 140, fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {emp.name}
+                    </div>
+                    <div style={{ flex: 1, height: 20, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: 4,
+                        width: topEmployees[0]?.count > 0 ? `${(emp.count / topEmployees[0].count) * 100}%` : "0%",
+                        background: idx === 0 ? "#f59e0b" : idx === 1 ? "#94a3b8" : idx === 2 ? "#b45309" : "#3b82f6",
+                        transition: "width 0.4s ease",
+                      }} />
+                    </div>
+                    <div style={{ width: 40, textAlign: "right", fontWeight: 700, fontSize: 13 }}>{emp.count}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

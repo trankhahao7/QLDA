@@ -8,6 +8,7 @@ import {
   type SlaItem,
   type SlaViolationItem,
 } from "../../services/sla/slaApi";
+import { fetchPendingApprovals, type PendingApprovalItem } from "../../services/workflows/approvalsApi";
 
 const DON_VI_OPTIONS = ["PHUT", "GIO", "NGAY"];
 const DON_VI_LABEL: Record<string, string> = {
@@ -34,9 +35,11 @@ export default function SlaManagement() {
   const [editState, setEditState] = useState<EditState>({ thoiGianXuLy: "", donViThoiGian: "NGAY", ghiChu: "" });
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"config" | "violations">("config");
+  const [activeTab, setActiveTab] = useState<"config" | "violations" | "warning">("config");
   const [violations, setViolations] = useState<SlaViolationItem[]>([]);
   const [loadingViolations, setLoadingViolations] = useState(false);
+  const [warnItems, setWarnItems] = useState<PendingApprovalItem[]>([]);
+  const [loadingWarn, setLoadingWarn] = useState(false);
 
   useEffect(() => {
     fetchWorkflows({ page: 0, size: 100, suDung: true })
@@ -82,6 +85,23 @@ export default function SlaManagement() {
       .then((items) => setViolations(Array.isArray(items) ? items : []))
       .catch(() => setViolations([]))
       .finally(() => setLoadingViolations(false));
+  };
+
+  const loadWarnings = () => {
+    setLoadingWarn(true);
+    const twoDaysLater = new Date();
+    twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+    const toDate = twoDaysLater.toISOString().split("T")[0];
+    fetchPendingApprovals({ page: 0, size: 200 })
+      .then((res) => {
+        const items = (res.content || []).filter((item) => {
+          if (!item.hanXuLy) return false;
+          return new Date(item.hanXuLy) <= twoDaysLater;
+        });
+        setWarnItems(items);
+      })
+      .catch(() => setWarnItems([]))
+      .finally(() => setLoadingWarn(false));
   };
 
   const handleSave = async (item: SlaItem) => {
@@ -134,6 +154,14 @@ export default function SlaManagement() {
           >
             Vi phạm SLA {violations.length > 0 && `(${violations.length})`}
           </button>
+          <button
+            type="button"
+            className={`filter-tab${activeTab === "warning" ? " active" : ""}`}
+            onClick={() => { setActiveTab("warning"); loadWarnings(); }}
+            style={{ color: warnItems.length > 0 ? "#f59e0b" : undefined }}
+          >
+            Sắp hết hạn {warnItems.length > 0 && `(${warnItems.length})`}
+          </button>
         </div>
       </div>
 
@@ -184,7 +212,69 @@ export default function SlaManagement() {
         </div>
       )}
 
-      {activeTab !== "violations" && (
+      {activeTab === "warning" && (
+        <div className="card">
+          {loadingWarn && (
+            <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
+          )}
+          {!loadingWarn && warnItems.length === 0 && (
+            <div className="empty-state" style={{ padding: "32px 0" }}>
+              <div className="empty-state__icon">✅</div>
+              <h3>Không có văn bản sắp hết hạn</h3>
+              <p>Tất cả văn bản đang trong hạn xử lý (≤ 2 ngày tới).</p>
+            </div>
+          )}
+          {!loadingWarn && warnItems.length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Mã văn bản</th>
+                    <th>Nội dung</th>
+                    <th>Người gửi</th>
+                    <th>Hạn xử lý</th>
+                    <th>Tình trạng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {warnItems.map((item) => {
+                    const deadline = item.hanXuLy ? new Date(item.hanXuLy) : null;
+                    const isOverdue = deadline && deadline < new Date();
+                    const daysLeft = deadline
+                      ? Math.ceil((deadline.getTime() - Date.now()) / 86400000)
+                      : null;
+                    return (
+                      <tr key={item.processingId}>
+                        <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu || `#${item.documentId}`}</td>
+                        <td style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.trichYeu}
+                        </td>
+                        <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.nguoiGuiTen || "-"}</td>
+                        <td style={{ whiteSpace: "nowrap", color: isOverdue ? "#ef4444" : "#f59e0b", fontWeight: 600 }}>
+                          {deadline ? deadline.toLocaleDateString("vi-VN") : "-"}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {isOverdue
+                            ? <span className="badge badge--danger">Quá hạn</span>
+                            : daysLeft !== null && daysLeft === 0
+                              ? <span className="badge badge--danger">Hôm nay</span>
+                              : <span className="badge badge--warning">Còn {daysLeft} ngày</span>
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ padding: "12px 0 4px", display: "flex", justifyContent: "flex-end" }}>
+            <button className="button secondary" onClick={loadWarnings} style={{ fontSize: 13 }}>🔄 Làm mới</button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "config" && (
         <>
       <div className="card" style={{ marginBottom: 16, padding: "16px" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, maxWidth: 400 }}>

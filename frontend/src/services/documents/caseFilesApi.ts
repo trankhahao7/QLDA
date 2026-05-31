@@ -10,6 +10,22 @@ export type CaseFileItem = {
   trangThai?: number;
 };
 
+export type CaseFileDocumentItem = {
+  id: number;
+  soKyHieu?: string;
+  trichYeu?: string;
+};
+
+export type CaseFileDetail = {
+  id: number;
+  maHoSo: string;
+  tenHoSo: string;
+  nguoiPhuTrachId?: number;
+  donViId?: number;
+  trangThai?: number;
+  documents?: CaseFileDocumentItem[];
+};
+
 export const fetchCaseFiles = (params?: {
   page?: number;
   size?: number;
@@ -23,7 +39,7 @@ export const fetchCaseFiles = (params?: {
 );
 
 export const fetchCaseFileDetail = (id: number) =>
-  apiGet<CaseFileItem>(`/api/documents/case-files/${id}`);
+  apiGet<CaseFileDetail>(`/api/documents/case-files/${id}`);
 
 export const createCaseFile = (payload: {
   maHoSo: string;
