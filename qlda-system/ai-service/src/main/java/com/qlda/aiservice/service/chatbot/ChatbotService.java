@@ -30,6 +30,7 @@ public class ChatbotService {
 
     private static final String NO_DATA_MESSAGE = "Không tìm thấy dữ liệu phù hợp.";
     private static final int DUE_SOON_DAYS = 3;
+    private static final int MAX_HISTORY = 5;
 
     private final AiResultRepository aiResultRepository;
     private final EmbeddingService embeddingService;
@@ -74,12 +75,13 @@ public class ChatbotService {
 
     public Map<String, Object> ask(ChatbotAskRequest request) {
         try {
+            List<Map<String, String>> history = trimHistory(request.conversationHistory());
             IntentDetectionResult detectionResult = chatbotIntentDetector.detect(request.question());
             ChatbotExecution execution = switch (detectionResult.intent()) {
-                case DOCUMENT_SEARCH -> processDocumentSearch(request);
-                case SYSTEM_STATISTIC -> processSystemStatistic(request, detectionResult.metricCode());
-                case USER_GUIDE -> processUserGuide(request);
-                case GENERAL_HELP -> processGeneralHelp(request);
+                case DOCUMENT_SEARCH -> processDocumentSearch(request, history);
+                case SYSTEM_STATISTIC -> processSystemStatistic(request, detectionResult.metricCode(), history);
+                case USER_GUIDE -> processUserGuide(request, history);
+                case GENERAL_HELP -> processGeneralHelp(request, history);
             };
 
             AiResultEntity saved = saveResult(request, detectionResult, execution);
@@ -93,7 +95,9 @@ public class ChatbotService {
                 execution.value(),
                 execution.sources(),
                 execution.modelUsed(),
-                execution.confidence()
+                execution.confidence(),
+                execution.responseType(),
+                execution.structuredData()
             );
         } catch (AppException ex) {
             throw ex;
@@ -102,7 +106,8 @@ public class ChatbotService {
         }
     }
 
-    private ChatbotExecution processDocumentSearch(ChatbotAskRequest request) {
+    private ChatbotExecution processDocumentSearch(ChatbotAskRequest request,
+                                                    List<Map<String, String>> history) {
         List<Double> queryEmbedding = embeddingService.generateEmbedding(request.question());
         Long contextDocumentId = extractDocumentId(request.context());
 
@@ -113,83 +118,109 @@ public class ChatbotService {
         List<AiDocumentChunkEntity> topChunks = accessibleChunks.stream().limit(topK).toList();
 
         if (topChunks.isEmpty()) {
-            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
+            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0, "TEXT", null);
         }
 
         String retrievedDocuments = topChunks.stream()
             .map(AiDocumentChunkEntity::getNoiDung)
             .reduce("", (a, b) -> a + "\n" + b)
             .trim();
-        String userPrompt = chatbotPromptBuilder.buildDocumentSearchPrompt(request.question(), retrievedDocuments);
+        String userPrompt = chatbotPromptBuilder.buildDocumentSearchPrompt(
+            request.question(), retrievedDocuments, history);
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
             chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
+        List<Map<String, Object>> sources = mapSources(topChunks);
+        Map<String, Object> structuredData = chatbotResultMapper.buildDocumentStructuredData(sources);
         return new ChatbotExecution(
-            llmResponse.answer(), null, mapSources(topChunks),
-            llmResponse.modelUsed(), llmResponse.confidence()
+            llmResponse.answer(), null, sources,
+            llmResponse.modelUsed(), llmResponse.confidence(),
+            "DOCUMENT_LIST", structuredData
         );
     }
 
-    private ChatbotExecution processUserGuide(ChatbotAskRequest request) {
+    private ChatbotExecution processUserGuide(ChatbotAskRequest request,
+                                               List<Map<String, String>> history) {
         List<Double> queryEmbedding = embeddingService.generateEmbedding(request.question());
         List<AiDocumentChunkEntity> rankedChunks = vectorSearchService.findTopKUserGuide(queryEmbedding, topK);
 
         if (rankedChunks.isEmpty()) {
-            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
+            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0, "TEXT", null);
         }
 
         String guideContext = rankedChunks.stream()
             .map(AiDocumentChunkEntity::getNoiDung)
             .reduce("", (a, b) -> a + "\n" + b)
             .trim();
-        String userPrompt = chatbotPromptBuilder.buildUserGuidePrompt(request.question(), guideContext);
+        String userPrompt = chatbotPromptBuilder.buildUserGuidePrompt(
+            request.question(), guideContext, history, request.currentModule());
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
             chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
+        Map<String, Object> structuredData = chatbotResultMapper.buildGuideStepsStructuredData(llmResponse.answer());
+        String responseType = structuredData.isEmpty() ? "TEXT" : "GUIDE_STEPS";
         return new ChatbotExecution(
             llmResponse.answer(), null, mapSources(rankedChunks),
-            llmResponse.modelUsed(), llmResponse.confidence()
+            llmResponse.modelUsed(), llmResponse.confidence(),
+            responseType, structuredData.isEmpty() ? null : structuredData
         );
     }
 
-    private ChatbotExecution processGeneralHelp(ChatbotAskRequest request) {
+    private ChatbotExecution processGeneralHelp(ChatbotAskRequest request,
+                                                 List<Map<String, String>> history) {
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
             chatbotPromptBuilder.generalHelpSystemPrompt(),
-            chatbotPromptBuilder.buildGeneralHelpPrompt(request.question()),
+            chatbotPromptBuilder.buildGeneralHelpPrompt(request.question(), history),
             request.question()
         );
-        return new ChatbotExecution(llmResponse.answer(), null, List.of(), llmResponse.modelUsed(), llmResponse.confidence());
+        return new ChatbotExecution(llmResponse.answer(), null, List.of(),
+            llmResponse.modelUsed(), llmResponse.confidence(), "TEXT", null);
     }
 
-    private ChatbotExecution processSystemStatistic(ChatbotAskRequest request, ChatbotMetricCode metricCode) {
+    private ChatbotExecution processSystemStatistic(ChatbotAskRequest request,
+                                                     ChatbotMetricCode metricCode,
+                                                     List<Map<String, String>> history) {
         if (metricCode == null) {
-            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0);
+            return new ChatbotExecution(NO_DATA_MESSAGE, null, List.of(), "system", 100.0, "TEXT", null);
         }
         long value = switch (metricCode) {
             case MY_UPLOADED_DOCUMENT_COUNT -> documentInternalApiService.getMyUploadedDocumentCount(request.userId());
+            case MY_PENDING_DOCUMENT_COUNT -> workflowInternalApiService.getMyPendingDocumentCount(request.userId());
+            case MY_COMPLETED_DOCUMENT_COUNT -> workflowInternalApiService.getMyCompletedDocumentCount(request.userId());
             case MY_DUE_SOON_DOCUMENT_COUNT -> workflowInternalApiService.getMyDueSoonDocumentCount(request.userId(), DUE_SOON_DAYS);
             case MY_OVERDUE_DOCUMENT_COUNT -> workflowInternalApiService.getMyOverdueDocumentCount(request.userId());
             case TOTAL_DOCUMENT_COUNT -> documentInternalApiService.getTotalDocumentCount();
             case TOTAL_USER_COUNT -> getTotalUserCountWithPermissionCheck(request.userId());
+            case TOTAL_INCOMING_DOCUMENT_COUNT -> documentInternalApiService.getTotalIncomingDocumentCount();
+            case SLA_VIOLATION_COUNT -> workflowInternalApiService.getSlaViolationCount();
+            case DOCUMENT_THIS_MONTH_COUNT -> documentInternalApiService.getDocumentThisMonthCount();
         };
-        String userPrompt = chatbotPromptBuilder.buildStatisticPrompt(request.question(), metricCode, value);
+        String label = chatbotPromptBuilder.getMetricLabel(metricCode);
+        String userPrompt = chatbotPromptBuilder.buildStatisticPrompt(
+            request.question(), metricCode, value, history);
         ChatbotLlmResponse llmResponse = chatbotLlmService.generateAnswer(
             chatbotPromptBuilder.systemPrompt(), userPrompt, request.question()
         );
-        return new ChatbotExecution(llmResponse.answer(), value, List.of(), llmResponse.modelUsed(), llmResponse.confidence());
+        Map<String, Object> structuredData = chatbotResultMapper.buildStatCardStructuredData(metricCode, value, label);
+        return new ChatbotExecution(llmResponse.answer(), value, List.of(),
+            llmResponse.modelUsed(), llmResponse.confidence(), "STAT_CARD", structuredData);
     }
 
     private long getTotalUserCountWithPermissionCheck(Long userId) {
         if (!authInternalApiService.hasSystemStatisticPermission(userId)) {
-            throw new AppException(ErrorCode.CHATBOT_FAILED, HttpStatus.FORBIDDEN, "User has no permission for TOTAL_USER_COUNT");
+            throw new AppException(ErrorCode.CHATBOT_FAILED, HttpStatus.FORBIDDEN,
+                "User has no permission for TOTAL_USER_COUNT");
         }
         return authInternalApiService.getTotalUserCount(userId);
     }
 
-    private List<AiDocumentChunkEntity> filterByAccess(Long userId, Long contextDocumentId, List<AiDocumentChunkEntity> chunks) {
+    private List<AiDocumentChunkEntity> filterByAccess(Long userId, Long contextDocumentId,
+                                                        List<AiDocumentChunkEntity> chunks) {
         LinkedHashMap<Long, Boolean> docIds = new LinkedHashMap<>();
         for (AiDocumentChunkEntity chunk : chunks) {
-            if (chunk.getVanBanId() != null) docIds.put(chunk.getVanBanId(), true);
+            if (chunk.getVanBanId() != null && chunk.getVanBanId() > 0) {
+                docIds.put(chunk.getVanBanId(), true);
+            }
         }
         if (contextDocumentId != null) docIds.put(contextDocumentId, true);
         if (docIds.isEmpty()) return chunks;
@@ -199,7 +230,7 @@ public class ChatbotService {
                 userId, new ArrayList<>(docIds.keySet())
             );
             return chunks.stream()
-                .filter(c -> allowed.contains(c.getVanBanId()))
+                .filter(c -> c.getVanBanId() == null || c.getVanBanId() <= 0 || allowed.contains(c.getVanBanId()))
                 .toList();
         } catch (Exception ex) {
             return chunks;
@@ -216,11 +247,20 @@ public class ChatbotService {
             Map<String, Object> metadata = fromJsonMap(chunk.getMetadata());
             Object title = metadata.get("title") != null ? metadata.get("title") : metadata.get("trichYeu");
             if (title != null) source.put("title", title);
+            Object soKyHieu = metadata.get("soKyHieu");
+            if (soKyHieu != null) source.put("soKyHieu", soKyHieu);
             Object type = metadata.get("type");
             source.put("reference", type == null ? "DOCUMENT" : String.valueOf(type));
             sources.add(source);
         }
         return sources;
+    }
+
+    private List<Map<String, String>> trimHistory(List<Map<String, String>> history) {
+        if (history == null || history.isEmpty()) return List.of();
+        int size = history.size();
+        if (size <= MAX_HISTORY) return history;
+        return history.subList(size - MAX_HISTORY, size);
     }
 
     private AiResultEntity saveResult(
@@ -232,6 +272,7 @@ public class ChatbotService {
         noteData.put("intent", detectionResult.intent().name());
         if (detectionResult.metricCode() != null) noteData.put("metricCode", detectionResult.metricCode().name());
         if (!execution.sources().isEmpty()) noteData.put("sources", execution.sources());
+        if (request.currentModule() != null) noteData.put("module", request.currentModule());
 
         AiResultEntity entity = AiResultEntity.builder()
             .vanBanID(extractDocumentId(request.context()))
@@ -256,7 +297,9 @@ public class ChatbotService {
         if (context == null) return null;
         Object documentId = context.get("documentId");
         if (documentId instanceof Number n) return n.longValue();
-        if (documentId instanceof String s && !s.isBlank()) return Long.parseLong(s);
+        if (documentId instanceof String s && !s.isBlank()) {
+            try { return Long.parseLong(s); } catch (NumberFormatException ignored) {}
+        }
         return null;
     }
 
@@ -272,6 +315,8 @@ public class ChatbotService {
         Long value,
         List<Map<String, Object>> sources,
         String modelUsed,
-        double confidence
+        double confidence,
+        String responseType,
+        Map<String, Object> structuredData
     ) {}
 }

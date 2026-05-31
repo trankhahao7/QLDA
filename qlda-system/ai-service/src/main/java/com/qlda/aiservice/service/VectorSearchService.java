@@ -119,6 +119,14 @@ public class VectorSearchService {
         log.debug("Inserted {} chunks", entities.size());
     }
 
+    public long countGuideChunks() {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM ai_document_chunk WHERE metadata::jsonb ->> 'type' = 'huong_dan'",
+            Integer.class
+        );
+        return count != null ? count : 0L;
+    }
+
     /**
      * Chuyển List<Double> sang chuỗi pgvector: [x,y,z,...]
      */

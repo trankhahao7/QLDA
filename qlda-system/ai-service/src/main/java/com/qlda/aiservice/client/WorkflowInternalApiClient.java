@@ -62,6 +62,48 @@ public class WorkflowInternalApiClient implements WorkflowInternalApiService {
         return extractCount(envelope);
     }
 
+    @Override
+    public long getMyPendingDocumentCount(Long userId) {
+        try {
+            InternalApiEnvelope<?> envelope = exchange(
+                baseUrl + "/internal/workflows/statistics/my-pending-count?userId=" + userId,
+                HttpMethod.GET,
+                null
+            );
+            return extractCount(envelope);
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
+    @Override
+    public long getMyCompletedDocumentCount(Long userId) {
+        try {
+            InternalApiEnvelope<?> envelope = exchange(
+                baseUrl + "/internal/workflows/statistics/my-completed-count?userId=" + userId,
+                HttpMethod.GET,
+                null
+            );
+            return extractCount(envelope);
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
+    @Override
+    public long getSlaViolationCount() {
+        try {
+            InternalApiEnvelope<?> envelope = exchange(
+                baseUrl + "/internal/workflows/statistics/sla-violation-count",
+                HttpMethod.GET,
+                null
+            );
+            return extractCount(envelope);
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
     private long extractCount(InternalApiEnvelope<?> envelope) {
         Map<String, Object> raw = objectMapper.convertValue(envelope.data(), new TypeReference<>() {
         });

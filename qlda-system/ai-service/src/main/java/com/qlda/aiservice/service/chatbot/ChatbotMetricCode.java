@@ -1,9 +1,16 @@
 package com.qlda.aiservice.service.chatbot;
 
 public enum ChatbotMetricCode {
+    // Personal stats
     MY_UPLOADED_DOCUMENT_COUNT,
+    MY_PENDING_DOCUMENT_COUNT,
+    MY_COMPLETED_DOCUMENT_COUNT,
     MY_DUE_SOON_DOCUMENT_COUNT,
     MY_OVERDUE_DOCUMENT_COUNT,
+    // System-wide stats
     TOTAL_DOCUMENT_COUNT,
-    TOTAL_USER_COUNT
+    TOTAL_USER_COUNT,
+    TOTAL_INCOMING_DOCUMENT_COUNT,
+    SLA_VIOLATION_COUNT,
+    DOCUMENT_THIS_MONTH_COUNT
 }

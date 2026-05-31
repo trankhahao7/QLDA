@@ -21,4 +21,8 @@ public interface DocumentInternalApiService {
     long getMyUploadedDocumentCount(Long userId);
 
     long getTotalDocumentCount();
+
+    long getTotalIncomingDocumentCount();
+
+    long getDocumentThisMonthCount();
 }

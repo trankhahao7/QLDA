@@ -127,6 +127,40 @@ public class DocumentInternalApiClient implements DocumentInternalApiService {
         return value instanceof Number number ? number.longValue() : 0L;
     }
 
+    @Override
+    public long getTotalIncomingDocumentCount() {
+        try {
+            InternalApiEnvelope<?> envelope = exchange(
+                baseUrl + "/internal/documents/statistics/incoming-count",
+                HttpMethod.GET,
+                null
+            );
+            Map<String, Object> raw = objectMapper.convertValue(envelope.data(), new TypeReference<>() {
+            });
+            Object value = raw == null ? null : raw.get("count");
+            return value instanceof Number number ? number.longValue() : 0L;
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
+    @Override
+    public long getDocumentThisMonthCount() {
+        try {
+            InternalApiEnvelope<?> envelope = exchange(
+                baseUrl + "/internal/documents/statistics/this-month-count",
+                HttpMethod.GET,
+                null
+            );
+            Map<String, Object> raw = objectMapper.convertValue(envelope.data(), new TypeReference<>() {
+            });
+            Object value = raw == null ? null : raw.get("count");
+            return value instanceof Number number ? number.longValue() : 0L;
+        } catch (Exception ex) {
+            return 0L;
+        }
+    }
+
     private InternalApiEnvelope<?> exchange(String url, HttpMethod method, Object body) {
         try {
             HttpHeaders headers = new HttpHeaders();

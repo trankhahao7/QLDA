@@ -15,8 +15,43 @@ export type ChatbotSource = {
   score: number;
   matchedText: string;
   title?: string;
+  soKyHieu?: string;
   reference?: string;
 };
+
+export type ConversationMessage = {
+  role: "user" | "bot";
+  content: string;
+};
+
+export type DocumentResult = {
+  documentId: number;
+  title?: string;
+  soKyHieu?: string;
+};
+
+export type StatCardData = {
+  metricCode: string;
+  metricLabel: string;
+  value: number;
+};
+
+export type GuideStepsData = {
+  steps: string[];
+};
+
+export type ChatbotStructuredData = {
+  // DOCUMENT_LIST
+  documents?: DocumentResult[];
+  // STAT_CARD
+  metricCode?: string;
+  metricLabel?: string;
+  value?: number;
+  // GUIDE_STEPS
+  steps?: string[];
+};
+
+export type ChatbotResponseType = "TEXT" | "DOCUMENT_LIST" | "STAT_CARD" | "GUIDE_STEPS";
 
 export type ChatbotResponse = {
   resultId: number;
@@ -28,16 +63,26 @@ export type ChatbotResponse = {
   sources?: ChatbotSource[];
   modelUsed: string;
   confidence: number;
+  responseType?: ChatbotResponseType;
+  structuredData?: ChatbotStructuredData;
 };
 
 export const askChatbot = (payload: {
   userId: number;
   question: string;
-  context?: {
-    module?: string;
-    documentId?: number | null;
-  };
+  context?: { module?: string; documentId?: number | null };
+  conversationHistory?: ConversationMessage[];
+  currentModule?: string;
 }) => apiPost<ChatbotResponse>("/api/ai/chatbot/ask", payload);
+
+export const feedbackChatbot = (payload: {
+  resultId: number;
+  feedback: "UP" | "DOWN";
+  comment?: string;
+}) => apiPost<{ resultId: number; feedback: string; recorded: boolean }>(
+  "/api/ai/chatbot/feedback",
+  payload
+);
 
 export const fetchConversation = (conversationId: string) =>
   apiGet<{ conversationId: string; messages: Array<{ role: string; content: string; createdAt: string }> }>(
