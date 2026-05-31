@@ -4,6 +4,7 @@ import { getCurrentUser } from "../../services/auth/authApi";
 import {
   fetchNotifications,
   markNotificationRead,
+  deleteNotification,
   type NotificationItem,
 } from "../../services/notifications/notificationsApi";
 
@@ -86,6 +87,16 @@ export default function Notifications() {
       setItems((prev) =>
         prev.map((n) => (n.id === item.id ? { ...n, daDoc: true } : n))
       );
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, itemId: number) => {
+    e.stopPropagation();
+    try {
+      await deleteNotification(itemId);
+      setItems((prev) => prev.filter((n) => n.id !== itemId));
     } catch {
       // silently ignore
     }
@@ -191,16 +202,26 @@ export default function Notifications() {
                     </p>
                   )}
                 </div>
-                {!item.daDoc && (
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  {!item.daDoc && (
+                    <button
+                      type="button"
+                      className="btn-xs btn-xs--ghost"
+                      onClick={(e) => { e.stopPropagation(); handleMarkRead(item); }}
+                    >
+                      Đã đọc
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="btn-xs btn-xs--ghost"
-                    style={{ flexShrink: 0 }}
-                    onClick={(e) => { e.stopPropagation(); handleMarkRead(item); }}
+                    className="btn-xs"
+                    style={{ color: "#ef4444" }}
+                    onClick={(e) => handleDelete(e, item.id)}
+                    title="Xóa thông báo"
                   >
-                    Đã đọc
+                    ✕
                   </button>
-                )}
+                </div>
               </li>
             ))}
           </ul>

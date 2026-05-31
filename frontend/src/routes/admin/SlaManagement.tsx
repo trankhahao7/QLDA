@@ -3,8 +3,10 @@ import { ApiError } from "../../services/core/apiClient";
 import { fetchWorkflows, type WorkflowItem } from "../../services/workflows/workflowsApi";
 import {
   fetchSlaList,
+  fetchSlaViolations,
   updateStepSla,
   type SlaItem,
+  type SlaViolationItem,
 } from "../../services/sla/slaApi";
 
 const DON_VI_OPTIONS = ["PHUT", "GIO", "NGAY"];
@@ -32,6 +34,9 @@ export default function SlaManagement() {
   const [editState, setEditState] = useState<EditState>({ thoiGianXuLy: "", donViThoiGian: "NGAY", ghiChu: "" });
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"config" | "violations">("config");
+  const [violations, setViolations] = useState<SlaViolationItem[]>([]);
+  const [loadingViolations, setLoadingViolations] = useState(false);
 
   useEffect(() => {
     fetchWorkflows({ page: 0, size: 100, suDung: true })
@@ -71,6 +76,14 @@ export default function SlaManagement() {
     setSaveResult(null);
   };
 
+  const loadViolations = () => {
+    setLoadingViolations(true);
+    fetchSlaViolations({ page: 0, size: 100 })
+      .then((items) => setViolations(Array.isArray(items) ? items : []))
+      .catch(() => setViolations([]))
+      .finally(() => setLoadingViolations(false));
+  };
+
   const handleSave = async (item: SlaItem) => {
     const value = parseInt(editState.thoiGianXuLy, 10);
     if (isNaN(value) || value <= 0) {
@@ -106,10 +119,78 @@ export default function SlaManagement() {
       <div className="topbar">
         <div className="topbar__title">
           <h1>Quản lý SLA</h1>
-          <p>Cấu hình thời gian xử lý theo từng bước trong quy trình.</p>
+          <p>Cấu hình thời gian xử lý và theo dõi vi phạm SLA.</p>
         </div>
       </div>
 
+      <div className="filter-bar" style={{ marginBottom: 16 }}>
+        <div className="filter-tabs">
+          <button
+            type="button"
+            className={`filter-tab${activeTab === "config" ? " active" : ""}`}
+            onClick={() => setActiveTab("config")}
+          >
+            Cấu hình SLA
+          </button>
+          <button
+            type="button"
+            className={`filter-tab${activeTab === "violations" ? " active" : ""}`}
+            onClick={() => { setActiveTab("violations"); if (violations.length === 0) loadViolations(); }}
+          >
+            Vi phạm SLA {violations.length > 0 && `(${violations.length})`}
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "violations" && (
+        <div className="card">
+          {loadingViolations && (
+            <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
+          )}
+          {!loadingViolations && violations.length === 0 && (
+            <div className="empty-state" style={{ padding: "32px 0" }}>
+              <div className="empty-state__icon">✅</div>
+              <h3>Không có vi phạm SLA</h3>
+              <p>Tất cả văn bản đang được xử lý đúng hạn.</p>
+            </div>
+          )}
+          {!loadingViolations && violations.length > 0 && (
+            <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th>Văn bản</th>
+                  <th>Bước vi phạm</th>
+                  <th style={{ textAlign: "right" }}>Số ngày trễ</th>
+                  <th>Hạn xử lý</th>
+                </tr>
+              </thead>
+              <tbody>
+                {violations.map((v, i) => (
+                  <tr key={i}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{v.soKyHieu || `#${v.documentId}`}</div>
+                      {v.trichYeu && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{v.trichYeu}</div>}
+                    </td>
+                    <td>{v.tenBuoc}</td>
+                    <td style={{ textAlign: "right", color: "#ef4444", fontWeight: 700 }}>
+                      {v.soNgayTre != null ? `${v.soNgayTre} ngày` : "-"}
+                    </td>
+                    <td style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                      {v.hanXuLy ? new Date(v.hanXuLy).toLocaleDateString("vi-VN") : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div style={{ padding: "12px 0 4px", display: "flex", justifyContent: "flex-end" }}>
+            <button className="button secondary" onClick={loadViolations} style={{ fontSize: 13 }}>🔄 Làm mới</button>
+          </div>
+        </div>
+      )}
+
+      {activeTab !== "violations" && (
+        <>
       <div className="card" style={{ marginBottom: 16, padding: "16px" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, maxWidth: 400 }}>
           <strong>Chọn quy trình</strong>
@@ -242,6 +323,9 @@ export default function SlaManagement() {
           </p>
         </div>
       )}
+        </>
+      )}
     </section>
   );
 }
+

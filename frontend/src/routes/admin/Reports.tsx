@@ -9,6 +9,7 @@ import {
   fetchWorkflowProgress,
   fetchOverdueDocuments,
 } from "../../services/reports/reportsWorkflowApi";
+import { exportReport } from "../../services/reports/reportsExportApi";
 
 type WorkflowProgress = {
   totalTasks: number;
@@ -80,6 +81,7 @@ export default function Reports() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const loadAll = (from?: string, to?: string) => {
     setLoading(true);
@@ -128,6 +130,29 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportBackend = async (format: "xlsx" | "pdf") => {
+    setExporting(true);
+    try {
+      const res = await exportReport({
+        reportType: "DOCUMENT_STATISTICS",
+        format,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      });
+      if (res.fileUrl) {
+        const a = document.createElement("a");
+        a.href = res.fileUrl;
+        a.download = res.fileName || `bao-cao.${format}`;
+        a.click();
+      }
+    } catch {
+      // Fallback: use local CSV
+      exportCsv();
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const completionRate = workflow && workflow.totalTasks > 0
     ? Math.round((workflow.completedTasks / workflow.totalTasks) * 100)
     : (stats?.completionRate !== undefined ? Math.round(stats.completionRate) : null);
@@ -144,6 +169,12 @@ export default function Reports() {
         <div className="topbar__actions">
           <button className="button secondary" type="button" onClick={exportCsv} disabled={!stats}>
             Xuất CSV
+          </button>
+          <button className="button secondary" type="button" onClick={() => handleExportBackend("xlsx")} disabled={exporting || !stats}>
+            {exporting ? "Đang xuất..." : "Xuất Excel"}
+          </button>
+          <button className="button secondary" type="button" onClick={() => handleExportBackend("pdf")} disabled={exporting || !stats}>
+            {exporting ? "Đang xuất..." : "Xuất PDF"}
           </button>
           <button className="button secondary" type="button" onClick={() => loadAll(fromDate || undefined, toDate || undefined)}>
             Làm mới

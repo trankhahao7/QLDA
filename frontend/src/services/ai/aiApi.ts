@@ -1,5 +1,14 @@
 import { apiGet, apiPost, apiDelete } from "../core/apiClient";
 
+export type ClassifyResponse = {
+  documentId: number;
+  phanLoai: string;
+  tenPhanLoai?: string;
+  confidence: number;
+  lyDo?: string;
+  modelUsed?: string;
+};
+
 export type ChatbotSource = {
   documentId: number;
   chunkId: number;
@@ -37,3 +46,10 @@ export const fetchConversation = (conversationId: string) =>
 
 export const deleteConversation = (conversationId: string) =>
   apiDelete<{ conversationId: string }>(`/api/ai/chatbot/conversations/${conversationId}`);
+
+export const classifyDocument = (payload: {
+  documentId: number;
+  text: string;
+  categories?: string[];
+  language?: string;
+}) => apiPost<ClassifyResponse>("/api/ai/classify", payload);

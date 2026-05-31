@@ -21,3 +21,13 @@ export const fetchAuditLogs = (params?: {
   fromDate?: string;
   toDate?: string;
 }) => apiGet<PagedResponse<AuditLogItem>>("/api/auth/audit-logs", { params });
+
+export const fetchAuditLogDetail = (id: number) =>
+  apiGet<AuditLogItem>(`/api/auth/audit-logs/${id}`);
+
+export const exportAuditLogs = (params?: {
+  keyword?: string;
+  fromDate?: string;
+  toDate?: string;
+  format?: string;
+}) => apiGet<{ fileName: string; fileUrl: string }>("/api/auth/audit-logs/export", { params });

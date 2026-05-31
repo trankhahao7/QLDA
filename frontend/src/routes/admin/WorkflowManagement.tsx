@@ -4,11 +4,14 @@ import { fetchDocumentTypes } from "../../services/documents/documentTypesApi";
 import {
   createWorkflow,
   createWorkflowStep,
+  updateWorkflowStep,
+  deleteWorkflowStep,
   deleteWorkflow,
   fetchWorkflowDetail,
   fetchWorkflows,
   updateWorkflow,
   type WorkflowDetail,
+  type WorkflowStep,
 } from "../../services/workflows/workflowsApi";
 
 type Workflow = WorkflowDetail;
@@ -34,6 +37,9 @@ export default function WorkflowManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [expandedWorkflow, setExpandedWorkflow] = useState<number | null>(null);
+  const [editingStep, setEditingStep] = useState<{ workflowId: number; step: WorkflowStep } | null>(null);
+  const [editStepForm, setEditStepForm] = useState({ tenBuoc: "", vaiTroXuLy: "USER", thoiGianXuLy: 1, batBuocPheDuyet: false });
+  const [stepActionMsg, setStepActionMsg] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     maQuyTrinh: "",
@@ -144,7 +150,23 @@ export default function WorkflowManagement() {
           loaiVanBanId: formData.loaiVanBanId,
           suDung: formData.suDung,
         });
-        // TODO: cập nhật từng bước khi backend hỗ trợ batch update.
+        // Update steps individually
+        for (const step of formData.steps) {
+          if (step.order) {
+            const existing = editingWorkflow.steps?.find((s) => s.thuTuBuoc === step.order);
+            if (existing) {
+              await updateWorkflowStep(editingWorkflow.id, existing.id, {
+                tenBuoc: step.name, vaiTroXuLy: step.role,
+                thoiGianXuLy: step.timeAllowed, batBuocPheDuyet: step.required,
+              });
+            } else {
+              await createWorkflowStep(editingWorkflow.id, {
+                tenBuoc: step.name, thuTuBuoc: step.order, vaiTroXuLy: step.role,
+                thoiGianXuLy: step.timeAllowed, batBuocPheDuyet: step.required,
+              });
+            }
+          }
+        }
       } else {
         const created = await createWorkflow({
           maQuyTrinh: formData.maQuyTrinh,
@@ -200,6 +222,58 @@ export default function WorkflowManagement() {
       } catch (error) {
         console.error("Error loading workflow steps:", error);
       }
+    }
+  };
+
+  const openEditStep = (workflowId: number, step: WorkflowStep) => {
+    setEditingStep({ workflowId, step });
+    setEditStepForm({
+      tenBuoc: step.tenBuoc,
+      vaiTroXuLy: step.vaiTroXuLy || "USER",
+      thoiGianXuLy: step.thoiGianXuLy || 1,
+      batBuocPheDuyet: Boolean(step.batBuocPheDuyet),
+    });
+    setStepActionMsg(null);
+  };
+
+  const handleSaveStep = async () => {
+    if (!editingStep) return;
+    try {
+      await updateWorkflowStep(editingStep.workflowId, editingStep.step.id, {
+        tenBuoc: editStepForm.tenBuoc,
+        vaiTroXuLy: editStepForm.vaiTroXuLy,
+        thoiGianXuLy: editStepForm.thoiGianXuLy,
+        batBuocPheDuyet: editStepForm.batBuocPheDuyet,
+      });
+      setWorkflows((prev) =>
+        prev.map((wf) => {
+          if (wf.id !== editingStep.workflowId) return wf;
+          return {
+            ...wf,
+            steps: (wf.steps || []).map((s) =>
+              s.id === editingStep.step.id ? { ...s, ...editStepForm, thuTuBuoc: s.thuTuBuoc } : s
+            ),
+          };
+        })
+      );
+      setStepActionMsg("Đã cập nhật bước thành công.");
+      setEditingStep(null);
+    } catch (error) {
+      setStepActionMsg(error instanceof ApiError ? error.message : "Cập nhật thất bại.");
+    }
+  };
+
+  const handleDeleteStep = async (workflowId: number, stepId: number) => {
+    if (!confirm("Xóa bước này?")) return;
+    try {
+      await deleteWorkflowStep(workflowId, stepId);
+      setWorkflows((prev) =>
+        prev.map((wf) =>
+          wf.id !== workflowId ? wf : { ...wf, steps: (wf.steps || []).filter((s) => s.id !== stepId) }
+        )
+      );
+    } catch (error) {
+      setStepActionMsg(error instanceof ApiError ? error.message : "Xóa thất bại.");
     }
   };
 
@@ -435,19 +509,62 @@ export default function WorkflowManagement() {
 
             {expandedWorkflow === workflow.id && workflow.steps && (
               <div className="workflow-steps">
+                {stepActionMsg && expandedWorkflow === workflow.id && (
+                  <div style={{ padding: "6px 12px", marginBottom: 8, background: "#f0fdf4", borderRadius: 6, fontSize: 13, color: "#16a34a" }}>
+                    {stepActionMsg}
+                    <button onClick={() => setStepActionMsg(null)} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button>
+                  </div>
+                )}
                 {workflow.steps.map((step) => (
                   <div key={step.id} className="workflow-step">
                     <span className="step-badge">{step.thuTuBuoc}</span>
-                    <div className="step-details">
-                      <p className="step-name">{step.tenBuoc}</p>
-                      <p className="step-info">
-                        Vai trò: {step.vaiTroXuLy || "-"} • Thời gian: {step.thoiGianXuLy || 0} giờ
-                        {step.batBuocPheDuyet && " • Bắt buộc"}
-                      </p>
-                    </span></div>
-                  </span></div>
+                    {editingStep?.step.id === step.id ? (
+                      <div style={{ flex: 1, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <input
+                          className="form-control" style={{ flex: 1, minWidth: 140, fontSize: 13 }}
+                          value={editStepForm.tenBuoc}
+                          onChange={(e) => setEditStepForm({ ...editStepForm, tenBuoc: e.target.value })}
+                        />
+                        <select
+                          className="form-control" style={{ width: 140, fontSize: 13 }}
+                          value={editStepForm.vaiTroXuLy}
+                          onChange={(e) => setEditStepForm({ ...editStepForm, vaiTroXuLy: e.target.value })}
+                        >
+                          <option value="USER">Người dùng</option>
+                          <option value="APPROVER">Người phê duyệt</option>
+                          <option value="ADMIN">Quản trị viên</option>
+                        </select>
+                        <input
+                          type="number" min={1} className="form-control" style={{ width: 80, fontSize: 13 }}
+                          value={editStepForm.thoiGianXuLy}
+                          onChange={(e) => setEditStepForm({ ...editStepForm, thoiGianXuLy: parseInt(e.target.value) || 1 })}
+                        />
+                        <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+                          <input type="checkbox" checked={editStepForm.batBuocPheDuyet}
+                            onChange={(e) => setEditStepForm({ ...editStepForm, batBuocPheDuyet: e.target.checked })} />
+                          Bắt buộc
+                        </label>
+                        <button className="button small" onClick={handleSaveStep}>Lưu</button>
+                        <button className="button small secondary" onClick={() => setEditingStep(null)}>Hủy</button>
+                      </div>
+                    ) : (
+                      <div className="step-details" style={{ flex: 1 }}>
+                        <p className="step-name">{step.tenBuoc}</p>
+                        <p className="step-info">
+                          Vai trò: {step.vaiTroXuLy || "-"} • Thời gian: {step.thoiGianXuLy || 0} giờ
+                          {step.batBuocPheDuyet && " • Bắt buộc"}
+                        </p>
+                      </div>
+                    )}
+                    {editingStep?.step.id !== step.id && (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="button small" style={{ fontSize: 11 }} onClick={() => openEditStep(workflow.id, step)}>Sửa</button>
+                        <button className="button small danger" style={{ fontSize: 11 }} onClick={() => handleDeleteStep(workflow.id, step.id)}>Xóa</button>
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </span></div>
+              </div>
             )}
 
             <div className="workflow-actions">

@@ -13,6 +13,10 @@ import {
 import type { DocumentDetail as DocDetail } from "../../services/documents/documentsApi";
 import type { AttachmentItem } from "../../services/documents/documentAttachmentsApi";
 import type { WorkflowTimelineItem } from "../../services/workflows/workflowTrackingApi";
+import { summarizeDocument } from "../../services/ai/userSummaryApi";
+import { generateHandlingSuggestion } from "../../services/ai/suggestionsApi";
+import { fetchAiResultsByDocument, deleteAiResult, type AiResultItem } from "../../services/ai/aiResultsApi";
+import { uploadOcrFile, processOcr, saveOcrResult } from "../../services/ai/ocrApi";
 
 const TRANG_THAI_MAP: Record<number, { label: string; className: string }> = {
   0: { label: "Nháp", className: "badge badge--ghost" },
@@ -54,6 +58,16 @@ export default function DocumentDetail() {
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // AI panel state
+  const [aiResults, setAiResults] = useState<AiResultItem[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  // OCR state
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [ocrProcessing, setOcrProcessing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -139,6 +153,62 @@ export default function DocumentDetail() {
     !doc?.daKySo;
 
   const stt = doc ? TRANG_THAI_MAP[doc.trangThai ?? -1] : null;
+
+  const loadAiResults = async (docId: number) => {
+    try {
+      const items = await fetchAiResultsByDocument(docId);
+      setAiResults(items || []);
+    } catch { /* ignore */ }
+  };
+
+  const handleAiSummarize = async () => {
+    if (!doc || !id) return;
+    setAiLoading(true); setAiMsg(null);
+    try {
+      const res = await summarizeDocument({ documentId: doc.id, text: doc.trichYeu, summaryType: "SHORT", language: "vi" });
+      setAiMsg(`Tóm tắt: ${res.summary}`);
+      loadAiResults(doc.id);
+    } catch (err) {
+      setAiMsg(err instanceof ApiError ? err.message : "Tóm tắt thất bại");
+    } finally { setAiLoading(false); }
+  };
+
+  const handleAiSuggest = async () => {
+    if (!doc) return;
+    setAiLoading(true); setAiMsg(null);
+    try {
+      const res = await generateHandlingSuggestion({
+        documentId: doc.id, text: doc.trichYeu,
+        context: { doKhan: doc.doKhan },
+      });
+      const list = res.suggestions?.map((s) => `• ${s.action}: ${s.description}`).join("\n") ?? "Không có gợi ý.";
+      setAiMsg(list);
+      loadAiResults(doc.id);
+    } catch (err) {
+      setAiMsg(err instanceof ApiError ? err.message : "Gợi ý thất bại");
+    } finally { setAiLoading(false); }
+  };
+
+  const handleDeleteAiResult = async (resultId: number) => {
+    if (!doc) return;
+    try {
+      await deleteAiResult(resultId);
+      setAiResults((prev) => prev.filter((r) => r.id !== resultId));
+    } catch { /* ignore */ }
+  };
+
+  const handleOcrProcess = async () => {
+    if (!ocrFile || !doc) return;
+    setOcrProcessing(true); setOcrText(null);
+    try {
+      const uploadRes = await uploadOcrFile(doc.id, ocrFile);
+      const processRes = await processOcr(doc.id, { fileUrl: uploadRes.fileUrl, language: "vi" });
+      setOcrText(processRes.ocrText);
+      await saveOcrResult(doc.id, { ocrText: processRes.ocrText, confidence: processRes.confidence });
+    } catch (err) {
+      setOcrText(err instanceof ApiError ? `Lỗi: ${err.message}` : "OCR thất bại");
+    } finally { setOcrProcessing(false); }
+  };
 
   return (
     <section>
@@ -267,6 +337,89 @@ export default function DocumentDetail() {
 
           {/* RIGHT COLUMN */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* AI PANEL */}
+            <div className="card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <h3 style={{ margin: 0 }}>🤖 Phân tích AI</h3>
+                <button
+                  className="btn-xs btn-xs--ghost"
+                  onClick={() => {
+                    setShowAiPanel((p) => !p);
+                    if (!showAiPanel && doc) loadAiResults(doc.id);
+                  }}
+                >
+                  {showAiPanel ? "Thu gọn" : "Mở rộng"}
+                </button>
+              </div>
+              {showAiPanel && (
+                <>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                    <button className="btn-xs btn-xs--primary" onClick={handleAiSummarize} disabled={aiLoading}>
+                      {aiLoading ? "..." : "📝 Tóm tắt"}
+                    </button>
+                    <button className="btn-xs btn-xs--primary" onClick={handleAiSuggest} disabled={aiLoading}>
+                      {aiLoading ? "..." : "💡 Gợi ý xử lý"}
+                    </button>
+                  </div>
+                  {aiMsg && (
+                    <div className="alert alert--info" style={{ marginBottom: 12, whiteSpace: "pre-line", fontSize: 13 }}>
+                      {aiMsg}
+                    </div>
+                  )}
+                  {aiResults.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>
+                        Lịch sử AI ({aiResults.length})
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {aiResults.map((r) => (
+                          <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "6px 8px", background: "var(--surface-subtle, #f9fafb)", borderRadius: 6, fontSize: 12 }}>
+                            <div>
+                              <span className="badge badge--ghost" style={{ marginRight: 6 }}>{r.loaiXuLyAI}</span>
+                              <span style={{ color: "var(--text-muted)" }}>
+                                {r.doTinCay != null && `${Math.round(r.doTinCay * 100)}%`}
+                              </span>
+                            </div>
+                            <button className="btn-xs" onClick={() => handleDeleteAiResult(r.id)} style={{ color: "#ef4444", fontSize: 11 }}>
+                              Xóa
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* OCR Section */}
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>📷 OCR văn bản</p>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.tiff"
+                      onChange={(e) => setOcrFile(e.target.files?.[0] || null)}
+                      style={{ fontSize: 12, marginBottom: 8, display: "block" }}
+                    />
+                    {ocrFile && (
+                      <button
+                        className="btn-xs btn-xs--primary"
+                        onClick={handleOcrProcess}
+                        disabled={ocrProcessing}
+                        style={{ marginBottom: 8 }}
+                      >
+                        {ocrProcessing ? "Đang xử lý..." : "Nhận dạng văn bản"}
+                      </button>
+                    )}
+                    {ocrText && (
+                      <textarea
+                        readOnly
+                        value={ocrText}
+                        rows={4}
+                        style={{ width: "100%", fontSize: 12, resize: "vertical", padding: 6 }}
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
             <div className="card">
               <h3>Tệp đính kèm</h3>
               {attachments.length === 0 ? (

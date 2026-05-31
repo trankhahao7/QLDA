@@ -6,6 +6,8 @@ import {
   deleteTemplate,
   fetchTemplates,
   updateTemplate,
+  applyTemplate,
+  createDocumentFromTemplate,
   type TemplateItem,
 } from "../../services/documents/templatesApi";
 
@@ -22,6 +24,9 @@ export default function TemplateManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [applyDocumentId, setApplyDocumentId] = useState("");
+  const [applyingTemplateId, setApplyingTemplateId] = useState<number | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     maTemplate: "",
@@ -132,6 +137,39 @@ export default function TemplateManagement() {
     }
   };
 
+  const handleApplyTemplate = async (template: TemplateItem) => {
+    const docId = parseInt(applyDocumentId, 10);
+    if (isNaN(docId) || docId <= 0) {
+      setActionMsg("Vui lòng nhập ID văn bản hợp lệ.");
+      return;
+    }
+    try {
+      setApplyingTemplateId(template.id);
+      await applyTemplate(template.id, { documentId: docId, overwrite: true });
+      setActionMsg(`Đã áp dụng mẫu "${template.tenTemplate}" vào văn bản #${docId}.`);
+      setApplyDocumentId("");
+    } catch (error) {
+      setActionMsg(error instanceof ApiError ? error.message : "Áp dụng mẫu thất bại.");
+    } finally {
+      setApplyingTemplateId(null);
+    }
+  };
+
+  const handleCreateFromTemplate = async (template: TemplateItem) => {
+    try {
+      setApplyingTemplateId(template.id);
+      const res = await createDocumentFromTemplate({
+        templateId: template.id,
+        loaiVanBanId: template.loaiVanBanId,
+      });
+      setActionMsg(`Đã tạo văn bản mới từ mẫu "${template.tenTemplate}". ID: ${res.documentId}${res.soKyHieu ? ` — ${res.soKyHieu}` : ""}`);
+    } catch (error) {
+      setActionMsg(error instanceof ApiError ? error.message : "Tạo văn bản thất bại.");
+    } finally {
+      setApplyingTemplateId(null);
+    }
+  };
+
   const handleDownloadTemplate = (template: TemplateItem) => {
     if (!template.tepMau) {
       alert("Template chưa có tệp mẫu để tải.");
@@ -185,7 +223,21 @@ export default function TemplateManagement() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
-      </span></div>
+        <input
+          type="number"
+          placeholder="ID văn bản để áp dụng..."
+          value={applyDocumentId}
+          onChange={(e) => setApplyDocumentId(e.target.value)}
+          className="filter-input"
+          style={{ width: 200 }}
+        />
+      </div>
+      {actionMsg && (
+        <div className="alert alert--info" style={{ marginBottom: 16 }}>
+          {actionMsg}
+          <button onClick={() => setActionMsg(null)} style={{ marginLeft: 12, background: "none", border: "none", cursor: "pointer" }}>✕</button>
+        </div>
+      )}
 
       {showForm && (
         <div className="admin-form-modal">
@@ -336,25 +388,30 @@ export default function TemplateManagement() {
               </span></div>
             </span></div>
             <div className="template-actions">
-              <button
-                className="button small"
-                onClick={() => handleDownloadTemplate(template)}
-              >
+              <button className="button small" onClick={() => handleDownloadTemplate(template)}>
                 📥 Tải xuống
               </button>
               <button
                 className="button small"
-                onClick={() => handleEditTemplate(template)}
+                onClick={() => handleCreateFromTemplate(template)}
+                disabled={applyingTemplateId === template.id}
+                title="Tạo văn bản mới từ mẫu này"
               >
-                Sửa
+                {applyingTemplateId === template.id ? "..." : "📄 Tạo từ mẫu"}
               </button>
-              <button
-                className="button small danger"
-                onClick={() => handleDeleteTemplate(template.id)}
-              >
-                Xóa
-              </button>
-            </span></div>
+              {applyDocumentId && (
+                <button
+                  className="button small"
+                  onClick={() => handleApplyTemplate(template)}
+                  disabled={applyingTemplateId === template.id}
+                  title={`Áp dụng mẫu này vào văn bản #${applyDocumentId}`}
+                >
+                  {applyingTemplateId === template.id ? "..." : "✅ Áp dụng"}
+                </button>
+              )}
+              <button className="button small" onClick={() => handleEditTemplate(template)}>Sửa</button>
+              <button className="button small danger" onClick={() => handleDeleteTemplate(template.id)}>Xóa</button>
+            </div>
           </span></div>
         ))}
       </span></div>

@@ -9,6 +9,18 @@ import type { AuthUser } from "../../services/auth/authApi";
 import type { UnitItem } from "../../services/units/unitsApi";
 import type { UserItem } from "../../services/auth/usersApi";
 import { createIncomingDocument, uploadAttachment } from "../../services/documents/documentsApi";
+import { indexDocument } from "../../services/ai/searchApi";
+import { classifyDocument } from "../../services/ai/aiApi";
+import { summarizeDocument } from "../../services/ai/userSummaryApi";
+import { extractMetadata } from "../../services/ai/userMetadataApi";
+
+type AiAnalysisResult = {
+  classification?: { phanLoai: string; confidence: number };
+  summary?: string;
+  metadata?: Record<string, string>;
+  chunksCreated?: number;
+  error?: string;
+};
 
 const DO_MAT_OPTIONS = [
   { value: "CONG_KHAI", label: "Công khai" },
@@ -50,6 +62,9 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<AiAnalysisResult | null>(null);
+  const [createdDocumentId, setCreatedDocumentId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -95,6 +110,32 @@ export default function Upload() {
     load();
   }, [form.loaiVanBanId]);
 
+  const runAiAnalysis = async (documentId: number, trichYeu: string) => {
+    setAiAnalyzing(true);
+    setAiResult(null);
+    const result: AiAnalysisResult = {};
+    try {
+      const [indexRes, classifyRes, summaryRes, metaRes] = await Promise.allSettled([
+        indexDocument({ documentId, content: trichYeu }),
+        classifyDocument({ documentId, text: trichYeu, language: "vi" }),
+        summarizeDocument({ documentId, text: trichYeu, summaryType: "SHORT", language: "vi" }),
+        extractMetadata({ documentId, text: trichYeu, language: "vi" }),
+      ]);
+      if (indexRes.status === "fulfilled") result.chunksCreated = indexRes.value.chunksCreated;
+      if (classifyRes.status === "fulfilled") {
+        result.classification = { phanLoai: classifyRes.value.phanLoai, confidence: classifyRes.value.confidence };
+      }
+      if (summaryRes.status === "fulfilled") result.summary = summaryRes.value.summary;
+      if (metaRes.status === "fulfilled") result.metadata = metaRes.value.metadata;
+    } catch {
+      result.error = "Phân tích AI không hoàn toàn.";
+    } finally {
+      setAiResult(result);
+      setAiAnalyzing(false);
+      setMessage({ type: "success", text: "Tải lên và phân tích AI hoàn tất!" });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -122,9 +163,13 @@ export default function Upload() {
 
       if (file) await uploadAttachment(created.id, file);
 
-      setMessage({ type: "success", text: "Tải lên thành công! Văn bản đã được đưa vào luồng xử lý." });
+      setMessage({ type: "success", text: "Tải lên thành công! Đang phân tích AI..." });
+      setCreatedDocumentId(created.id);
       setForm(INITIAL_FORM);
       setFile(null);
+
+      // AI auto-analyze in background
+      runAiAnalysis(created.id, form.trichYeu);
     } catch (err) {
       setMessage({ type: "error", text: err instanceof ApiError ? err.message : "Tải lên thất bại" });
     } finally {
@@ -308,6 +353,57 @@ export default function Upload() {
               <div className="form-section__title" style={{ marginBottom: 8 }}>👤 Người tạo</div>
               <p style={{ fontWeight: 600, fontSize: 14, color: "var(--text-strong)" }}>{currentUser.hoTen}</p>
               <p style={{ fontSize: 13 }}>{currentUser.email}</p>
+            </div>
+          )}
+
+          {(aiAnalyzing || aiResult) && (
+            <div className="card soft">
+              <div className="form-section__title" style={{ marginBottom: 10 }}>🤖 Phân tích AI</div>
+              {aiAnalyzing && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-muted)", fontSize: 13 }}>
+                  <div className="loading-spinner" style={{ width: 16, height: 16 }} />
+                  Đang phân tích văn bản...
+                </div>
+              )}
+              {!aiAnalyzing && aiResult && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
+                  {aiResult.classification && (
+                    <div>
+                      <strong>Phân loại:</strong>{" "}
+                      <span className="badge badge--info">{aiResult.classification.phanLoai}</span>{" "}
+                      <span style={{ color: "var(--text-muted)" }}>
+                        ({Math.round(aiResult.classification.confidence)}%)
+                      </span>
+                    </div>
+                  )}
+                  {aiResult.summary && (
+                    <div>
+                      <strong>Tóm tắt:</strong>
+                      <p style={{ marginTop: 4, color: "var(--text-muted)" }}>{aiResult.summary}</p>
+                    </div>
+                  )}
+                  {aiResult.metadata && Object.keys(aiResult.metadata).length > 0 && (
+                    <div>
+                      <strong>Metadata trích xuất:</strong>
+                      <ul style={{ marginTop: 4, paddingLeft: 16 }}>
+                        {Object.entries(aiResult.metadata).map(([k, v]) => (
+                          <li key={k} style={{ color: "var(--text-muted)" }}>
+                            <em>{k}:</em> {v}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {aiResult.chunksCreated !== undefined && (
+                    <div style={{ color: "var(--text-muted)" }}>
+                      Đã index {aiResult.chunksCreated} đoạn văn bản để tìm kiếm ngữ nghĩa.
+                    </div>
+                  )}
+                  {aiResult.error && (
+                    <div style={{ color: "#f59e0b" }}>⚠️ {aiResult.error}</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

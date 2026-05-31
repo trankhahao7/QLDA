@@ -42,3 +42,20 @@ export const updateTemplate = (id: number, payload: {
 
 export const deleteTemplate = (id: number) =>
   apiDelete<{ id: number }>(`/api/documents/templates/${id}`);
+
+export const applyTemplate = (templateId: number, payload: {
+  documentId: number;
+  overwrite?: boolean;
+}) => apiPost<{ documentId: number; applied: boolean }>(
+  `/api/documents/templates/${templateId}/apply`,
+  payload
+);
+
+export const createDocumentFromTemplate = (payload: {
+  templateId: number;
+  loaiVanBanId?: number;
+  metadata?: Record<string, unknown>;
+}) => apiPost<{ documentId: number; soKyHieu?: string }>(
+  "/api/documents/from-template",
+  payload
+);

@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from "../core/apiClient";
+import { apiDelete, apiGet, apiPatch } from "../core/apiClient";
 import type { PagedResponse } from "../auth/usersApi";
 
 export type NotificationItem = {
@@ -23,3 +23,6 @@ export const markNotificationRead = (id: number, nguoiNhanId: number) =>
     `/api/notifications/${id}/read`,
     { nguoiNhanId }
   );
+
+export const deleteNotification = (id: number) =>
+  apiDelete<{ id: number }>(`/api/notifications/${id}`);
