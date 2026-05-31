@@ -113,7 +113,14 @@ export default function Dashboard() {
           {recentDocs.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Chưa có văn bản đến.</p>
           ) : (
-            <table className="table" style={{ width: "100%" }}>
+            <table className="table" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "33%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "18%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th style={{ whiteSpace: "nowrap" }}>Mã</th>
@@ -128,8 +135,8 @@ export default function Dashboard() {
                   const stt = TRANG_THAI_MAP[doc.trangThai] ?? { label: "Không xác định", className: "badge badge--ghost" };
                   return (
                     <tr key={doc.id}>
-                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{doc.soKyHieu}</td>
-                      <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{doc.tenLoaiVanBan || "-"}</td>
+                      <td style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.soKyHieu}</td>
+                      <td style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.tenLoaiVanBan || "-"}</td>
                       <td>
                         <Link to={`/documents/${doc.id}`}>{doc.trichYeu}</Link>
                         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{doc.donViBanHanh}</div>
@@ -151,7 +158,13 @@ export default function Dashboard() {
           {pendingApprovals.length === 0 ? (
             <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Không có phê duyệt nào đang chờ.</p>
           ) : (
-            <table className="table" style={{ width: "100%" }}>
+            <table className="table" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "27%" }} />
+                <col style={{ width: "41%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "14%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th style={{ whiteSpace: "nowrap" }}>Mã</th>
@@ -163,7 +176,7 @@ export default function Dashboard() {
               <tbody>
                 {pendingApprovals.map((item) => (
                   <tr key={item.processingId}>
-                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu || "-"}</td>
+                    <td style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.soKyHieu || "-"}</td>
                     <td>
                       <Link to={`/documents/${item.documentId}`}>{item.trichYeu}</Link>
                     </td>

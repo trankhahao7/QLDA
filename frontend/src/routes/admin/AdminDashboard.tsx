@@ -40,11 +40,29 @@ const ACTION_LABELS: Record<string, string> = {
   SYNC_AZURE_USERS: "Đồng bộ Azure",
 };
 
+function toLocalDate(dt: string): Date {
+  // Server returns UTC without Z suffix — append Z so browser converts to local time
+  return new Date(dt.endsWith("Z") || dt.includes("+") ? dt : dt + "Z");
+}
+
 function formatTime(dt: string): string {
-  const d = new Date(dt);
+  const d = toLocalDate(dt);
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm} - Hôm nay`;
+  const time = `${hh}:${mm}`;
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
+
+  if (sameDay(d, today)) return `${time} - Hôm nay`;
+  if (sameDay(d, yesterday)) return `${time} - Hôm qua`;
+  return `${time} - ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function statusBadge(trangThai: number | undefined): string {

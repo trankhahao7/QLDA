@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
 const adminNavItems = [
@@ -10,27 +11,38 @@ const adminNavItems = [
   { to: "/admin/sla", label: "Quản lý SLA", icon: "⏱️" },
   { to: "/admin/templates", label: "Template văn bản", icon: "📋" },
   { to: "/admin/reports", label: "Báo cáo & Thống kê", icon: "📈" },
-  { to: "/admin/monitoring", label: "Giám sát hệ thống", icon: "🖥️" },
   { to: "/admin/audit-logs", label: "Nhật ký hệ thống", icon: "📝" },
 ];
 
 export default function AdminSidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <aside className="admin-sidebar">
+    <aside className={`admin-sidebar${collapsed ? " admin-sidebar--collapsed" : ""}`}>
       <div className="admin-sidebar__brand">
         <div className="admin-sidebar__brand-icon">⚙️</div>
-        <div>
-          <h2>Admin Panel</h2>
-          <span>Quản trị hệ thống</span>
-        </div>
+        {!collapsed && (
+          <div className="admin-sidebar__brand-text">
+            <h2>Admin Panel</h2>
+            <span>Quản trị hệ thống</span>
+          </div>
+        )}
+        <button
+          className="admin-sidebar__toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+        >
+          {collapsed ? "▶" : "◀"}
+        </button>
       </div>
 
       <nav className="admin-sidebar__nav">
-        <span className="admin-nav-section">Quản lý</span>
+        {!collapsed && <span className="admin-nav-section">Quản lý</span>}
         {adminNavItems.slice(0, 6).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               isActive ? "admin-nav-link active" : "admin-nav-link"
             }
@@ -40,11 +52,12 @@ export default function AdminSidebar() {
           </NavLink>
         ))}
 
-        <span className="admin-nav-section">Vận hành</span>
+        {!collapsed && <span className="admin-nav-section">Vận hành</span>}
         {adminNavItems.slice(6).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            title={collapsed ? item.label : undefined}
             className={({ isActive }) =>
               isActive ? "admin-nav-link active" : "admin-nav-link"
             }
@@ -54,19 +67,13 @@ export default function AdminSidebar() {
           </NavLink>
         ))}
 
-        <div style={{ height: 1, background: "rgba(255,255,255,0.12)", margin: "12px 0" }} />
-        <NavLink
-          to="/dashboard"
-          className="admin-nav-link"
-        >
-          <span className="icon">🏠</span>
-          <span>Quay lại người dùng</span>
-        </NavLink>
       </nav>
 
-      <div className="admin-sidebar__footer">
-        <p>eOIS Admin v1.0</p>
-      </div>
+      {!collapsed && (
+        <div className="admin-sidebar__footer">
+          <p>eOIS Admin v1.0</p>
+        </div>
+      )}
     </aside>
   );
 }

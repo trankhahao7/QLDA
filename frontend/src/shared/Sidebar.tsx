@@ -31,6 +31,7 @@ export default function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -52,22 +53,32 @@ export default function Sidebar() {
   }, [currentUserId]);
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`}>
       <div className="sidebar__brand">
         <div className="sidebar__brand-icon">📋</div>
-        <div className="sidebar__brand-text">
-          <h2>eOIS</h2>
-          <span>Hệ thống xử lý văn bản</span>
-        </div>
+        {!collapsed && (
+          <div className="sidebar__brand-text">
+            <h2>eOIS</h2>
+            <span>Hệ thống xử lý văn bản</span>
+          </div>
+        )}
+        <button
+          className="sidebar__toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+        >
+          {collapsed ? "▶" : "◀"}
+        </button>
       </div>
 
       <nav className="sidebar__nav">
-        <span className="sidebar__nav-section">Nghiệp vụ</span>
+        {!collapsed && <span className="sidebar__nav-section">Nghiệp vụ</span>}
 
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            title={collapsed ? item.label : undefined}
             className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
           >
             <span className="nav-link__icon">{item.icon}</span>
@@ -77,6 +88,7 @@ export default function Sidebar() {
 
         <NavLink
           to="/notifications"
+          title={collapsed ? "Thông báo" : undefined}
           className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
         >
           <span className="nav-link__icon">🔔</span>
@@ -91,9 +103,10 @@ export default function Sidebar() {
         {isAdmin && (
           <>
             <div className="nav-divider" />
-            <span className="sidebar__nav-section">Quản trị</span>
+            {!collapsed && <span className="sidebar__nav-section">Quản trị</span>}
             <NavLink
               to="/admin/dashboard"
+              title={collapsed ? "Quản trị hệ thống" : undefined}
               className={({ isActive }) =>
                 isActive ? "nav-link active admin-link" : "nav-link admin-link"
               }
@@ -104,7 +117,6 @@ export default function Sidebar() {
           </>
         )}
       </nav>
-
     </aside>
   );
 }

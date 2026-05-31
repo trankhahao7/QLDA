@@ -48,7 +48,7 @@ export default function AuditLogs() {
       });
       const mapped: AuditLog[] = (response.content || []).map((log: AuditLogItem) => ({
         id: log.id,
-        time: new Date(log.thoiGianThucHien).toLocaleString("vi-VN"),
+        time: new Date(log.thoiGianThucHien.endsWith("Z") || log.thoiGianThucHien.includes("+") ? log.thoiGianThucHien : log.thoiGianThucHien + "Z").toLocaleString("vi-VN"),
         user: log.hoTen || `User #${log.nguoiDungId}`,
         action: log.hanhDong,
         object: log.doiTuong || "Hệ thống",
@@ -232,7 +232,7 @@ export default function AuditLogs() {
               {detailLog && (
                 <table className="doc-meta-table">
                   <tbody>
-                    <tr><td>Thời gian</td><td>{new Date(detailLog.thoiGianThucHien).toLocaleString("vi-VN")}</td></tr>
+                    <tr><td>Thời gian</td><td>{new Date(detailLog.thoiGianThucHien.endsWith("Z") || detailLog.thoiGianThucHien.includes("+") ? detailLog.thoiGianThucHien : detailLog.thoiGianThucHien + "Z").toLocaleString("vi-VN")}</td></tr>
                     <tr><td>Người dùng</td><td>{detailLog.hoTen || `#${detailLog.nguoiDungId}`}</td></tr>
                     <tr><td>Hành động</td><td>{detailLog.hanhDong}</td></tr>
                     <tr><td>Đối tượng</td><td>{detailLog.doiTuong || "-"}{detailLog.doiTuongId ? ` #${detailLog.doiTuongId}` : ""}</td></tr>

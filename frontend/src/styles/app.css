@@ -1,6 +1,6 @@
 .app-shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: auto 1fr;
   min-height: 100svh;
 }
 
@@ -16,6 +16,9 @@
   top: 0;
   height: 100svh;
   overflow-y: auto;
+  width: 260px;
+  transition: width 0.25s ease, padding 0.25s ease;
+  overflow-x: hidden;
 }
 
 .sidebar__brand {
@@ -185,6 +188,78 @@
   font-size: 11.5px;
   color: var(--text-muted);
   margin-bottom: 10px;
+}
+
+/* ========== SIDEBAR TOGGLE BUTTON ========== */
+.sidebar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+  padding: 0;
+  line-height: 1;
+}
+
+.sidebar__toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+/* ========== SIDEBAR COLLAPSED ========== */
+.sidebar--collapsed {
+  width: 64px;
+  padding: 20px 8px;
+}
+
+.sidebar--collapsed .sidebar__brand {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0 16px;
+}
+
+.sidebar--collapsed .sidebar__brand-text {
+  display: none;
+}
+
+.sidebar--collapsed .sidebar__nav-section {
+  display: none;
+}
+
+.sidebar--collapsed .nav-link {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.sidebar--collapsed .nav-link__label {
+  display: none;
+}
+
+.sidebar--collapsed .nav-link__badge {
+  display: none;
+}
+
+.sidebar--collapsed .nav-link.active::before {
+  display: none;
+}
+
+.sidebar--collapsed .nav-divider {
+  margin: 8px 0;
+}
+
+.sidebar--collapsed .sidebar__toggle {
+  margin: 0 auto;
 }
 
 /* ========== BUTTONS ========== */
@@ -384,6 +459,22 @@
 
 .table tbody tr:hover {
   background: var(--surface-2);
+}
+
+/* Edge-to-edge table inside card */
+.card .table {
+  margin: 0 -22px;
+  width: calc(100% + 44px);
+}
+
+.card .table th:first-child,
+.card .table td:first-child {
+  padding-left: 22px;
+}
+
+.card .table th:last-child,
+.card .table td:last-child {
+  padding-right: 22px;
 }
 
 /* ========== BADGES ========== */

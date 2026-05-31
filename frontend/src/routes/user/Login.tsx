@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { setAccessToken } from "../../services/core/apiClient";
+import { setAccessToken, setRefreshToken } from "../../services/core/apiClient";
 import { loginAzure } from "../../services/auth/authApi";
 import { msalConfig } from "../../config/msal.config";
 import "../../styles/login.css";
@@ -88,6 +88,7 @@ export default function Login() {
     loginAzure(code, REDIRECT_URI, codeVerifier)
       .then((data) => {
         setAccessToken(data.accessToken);
+        if (data.refreshToken) setRefreshToken(data.refreshToken);
         const roles = data.user?.roles ?? [];
         window.location.href = roles.includes("ADMIN") ? "/admin/dashboard" : "/dashboard";
       })

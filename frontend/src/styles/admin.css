@@ -14,7 +14,9 @@
   flex-direction: column;
   box-shadow: 2px 0 20px rgba(79, 70, 229, 0.2);
   overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
+  transition: width 0.25s ease;
 }
 
 .admin-sidebar__brand {
@@ -121,6 +123,76 @@
   font-size: 11px;
   opacity: 0.5;
   text-align: center;
+}
+
+/* ========== ADMIN SIDEBAR TOGGLE BUTTON ========== */
+.admin-sidebar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.admin-sidebar__toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* ========== ADMIN SIDEBAR COLLAPSED ========== */
+.admin-sidebar--collapsed {
+  width: 64px;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__brand {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 0;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__brand-text {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-nav-section {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__nav {
+  padding: 12px 8px;
+}
+
+.admin-sidebar--collapsed .admin-nav-link {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.admin-sidebar--collapsed .admin-nav-link span:not(.icon) {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-nav-link.active::before {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__footer {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-sidebar__toggle {
+  margin: 0 auto;
 }
 
 .admin-main-content {

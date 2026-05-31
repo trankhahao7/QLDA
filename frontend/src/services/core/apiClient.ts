@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE_URL = "http://localhost:8080";
 const TOKEN_STORAGE_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
 
 export type ApiResponse<T> = {
   success: boolean;
@@ -29,6 +30,55 @@ export const getAccessToken = () =>
 export const setAccessToken = (token: string) => {
   sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
 };
+
+export const getRefreshToken = () =>
+  sessionStorage.getItem(REFRESH_TOKEN_KEY) || "";
+
+export const setRefreshToken = (token: string) => {
+  sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
+};
+
+export const clearTokens = () => {
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+let refreshingPromise: Promise<string | null> | null = null;
+
+async function attemptTokenRefresh(): Promise<string | null> {
+  const rt = getRefreshToken();
+  if (!rt) return null;
+
+  if (!refreshingPromise) {
+    refreshingPromise = fetch(
+      new URL("/api/auth/refresh-token", getApiBaseUrl()).toString(),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: rt }),
+      }
+    )
+      .then(async (res) => {
+        const payload = await res.json().catch(() => null) as ApiResponse<{
+          accessToken: string;
+          refreshToken?: string;
+        }> | null;
+        if (!res.ok || !payload?.success) throw new Error("refresh failed");
+        setAccessToken(payload.data.accessToken);
+        if (payload.data.refreshToken) setRefreshToken(payload.data.refreshToken);
+        return payload.data.accessToken;
+      })
+      .catch(() => {
+        clearTokens();
+        return null;
+      })
+      .finally(() => {
+        refreshingPromise = null;
+      });
+  }
+
+  return refreshingPromise;
+}
 
 type RequestOptions = {
   method?: string;
@@ -86,20 +136,44 @@ export const apiRequest = async <T,>(
     requestHeaders["Content-Type"] = requestHeaders["Content-Type"] || "application/json";
   }
 
+  const bodyForFetch = body ? (isFormData ? body : JSON.stringify(body)) : undefined;
+
   try {
     const response = await fetch(buildUrl(path, params), {
       method,
       headers: requestHeaders,
-      body: body
-        ? isFormData
-          ? body
-          : JSON.stringify(body)
-        : undefined,
+      body: bodyForFetch,
       signal: controller.signal,
     });
 
-    const payload = await parseJson<ApiResponse<T>>(response);
     clearTimeout(timeoutId);
+
+    if (response.status === 401 && auth && !path.includes("/refresh-token")) {
+      const newToken = await attemptTokenRefresh();
+      if (newToken) {
+        requestHeaders.Authorization = `Bearer ${newToken}`;
+        const retryResponse = await fetch(buildUrl(path, params), {
+          method,
+          headers: requestHeaders,
+          body: bodyForFetch,
+        });
+        const retryPayload = await parseJson<ApiResponse<T>>(retryResponse);
+        if (!retryResponse.ok || !retryPayload?.success) {
+          throw new ApiError(
+            retryPayload?.message || retryResponse.statusText || "Request failed",
+            retryResponse.status,
+            retryPayload?.errorCode
+          );
+        }
+        return retryPayload.data;
+      }
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
+      throw new ApiError("Phiên đăng nhập đã hết hạn", 401);
+    }
+
+    const payload = await parseJson<ApiResponse<T>>(response);
 
     if (!response.ok || !payload?.success) {
       const message = payload?.message || response.statusText || "Request failed";
