@@ -12,10 +12,25 @@
   --accent-strong: #0b4d4a;
   --accent-soft: rgba(15, 118, 110, 0.12);
   --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.12);
   --info: #2563eb;
+  --info-soft: rgba(37, 99, 235, 0.12);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.12);
+  --purple: #7c3aed;
+  --purple-soft: rgba(124, 58, 237, 0.12);
   --shadow:
-    rgba(13, 38, 59, 0.12) 0 18px 40px -20px,
-    rgba(13, 38, 59, 0.08) 0 10px 20px -18px;
+    rgba(13, 38, 59, 0.10) 0 4px 16px -4px,
+    rgba(13, 38, 59, 0.06) 0 1px 4px 0px;
+  --shadow-lg:
+    rgba(13, 38, 59, 0.14) 0 20px 48px -12px,
+    rgba(13, 38, 59, 0.08) 0 8px 20px -8px;
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-lg: 20px;
+  --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 
   --sans: "Plus Jakarta Sans", "Segoe UI", sans-serif;
   --heading: "Space Grotesk", "Segoe UI", sans-serif;

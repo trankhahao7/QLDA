@@ -8,10 +8,7 @@ import { fetchPendingApprovals, type PendingApprovalItem } from "../../services/
 import { approveProcessing, rejectProcessing } from "../../services/workflows/workflowApprovalsApi";
 import { fetchAttachments, triggerDownload } from "../../services/documents/documentAttachmentsApi";
 import {
-  signDocument,
-  getOneDriveEditUrl,
-  getSignatureInfo,
-  type SignatureInfo,
+  signDocument, getOneDriveEditUrl, getSignatureInfo, type SignatureInfo,
 } from "../../services/documents/documentsPublishApi";
 import type { DocumentDetail as DocDetail } from "../../services/documents/documentsApi";
 import type { AttachmentItem } from "../../services/documents/documentAttachmentsApi";
@@ -33,15 +30,8 @@ const formatSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const formatDate = (dateStr?: string) => {
-  if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleDateString("vi-VN");
-};
-
-const formatDateTime = (dateStr?: string | null) => {
-  if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleString("vi-VN");
-};
+const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString("vi-VN") : "-";
+const formatDateTime = (dateStr?: string | null) => dateStr ? new Date(dateStr).toLocaleString("vi-VN") : "-";
 
 export default function DocumentDetail() {
   const { id } = useParams();
@@ -67,53 +57,37 @@ export default function DocumentDetail() {
 
   useEffect(() => {
     if (!id) return;
-
     const loadDetail = async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
         const [detail, user, attList, tl] = await Promise.all([
-          fetchIncomingDetail(Number(id)),
-          getCurrentUser(),
-          fetchAttachments(Number(id)),
-          fetchWorkflowTimeline(Number(id)),
+          fetchIncomingDetail(Number(id)), getCurrentUser(),
+          fetchAttachments(Number(id)), fetchWorkflowTimeline(Number(id)),
         ]);
-
-        setDoc(detail);
-        setAttachments(attList || []);
-        setTimeline(tl || []);
-        setCurrentUser(user);
+        setDoc(detail); setAttachments(attList || []); setTimeline(tl || []); setCurrentUser(user);
 
         const [pendingResp, editUrlResp, sigResp] = await Promise.all([
           fetchPendingApprovals({ page: 0, size: 100, nguoiDuyetId: user.id }),
           getOneDriveEditUrl(Number(id)).catch(() => ({ data: null })),
           getSignatureInfo(Number(id)).catch(() => ({ data: null })),
         ]);
-
-        const match = (pendingResp.content || []).find(
-          (p) => p.documentId === Number(id)
-        );
+        const match = (pendingResp.content || []).find((p) => p.documentId === Number(id));
         setPendingApproval(match || null);
         setOneDriveUrl((editUrlResp as { data: string | null }).data ?? null);
         setSignatureInfo((sigResp as { data: SignatureInfo | null }).data ?? null);
       } catch (err) {
-        const message = err instanceof ApiError ? err.message : "Không thể tải chi tiết văn bản";
-        setError(message);
+        setError(err instanceof ApiError ? err.message : "Không thể tải chi tiết văn bản");
       } finally {
         setLoading(false);
       }
     };
-
     loadDetail();
   }, [id]);
 
   const handleApprove = async () => {
     if (!pendingApproval) return;
     if (!window.confirm("Xác nhận phê duyệt văn bản này?")) return;
-
-    setSubmitting(true);
-    setActionMsg(null);
-    setActionError(null);
+    setSubmitting(true); setActionMsg(null); setActionError(null);
     try {
       await approveProcessing(pendingApproval.processingId, { chuyenBuocTiepTheo: true });
       setActionMsg("Phê duyệt thành công!");
@@ -121,22 +95,14 @@ export default function DocumentDetail() {
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Phê duyệt thất bại");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleReject = async () => {
     if (!pendingApproval) return;
-    if (!rejectReason.trim()) {
-      setActionError("Vui lòng nhập lý do từ chối");
-      return;
-    }
+    if (!rejectReason.trim()) { setActionError("Vui lòng nhập lý do từ chối"); return; }
     if (!window.confirm("Xác nhận từ chối văn bản này?")) return;
-
-    setSubmitting(true);
-    setActionMsg(null);
-    setActionError(null);
+    setSubmitting(true); setActionMsg(null); setActionError(null);
     try {
       await rejectProcessing(pendingApproval.processingId, { lyDoTuChoi: rejectReason });
       setActionMsg("Đã từ chối văn bản!");
@@ -144,16 +110,12 @@ export default function DocumentDetail() {
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Từ chối thất bại");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleSign = async () => {
     if (!currentUser || !id) return;
-    setSubmitting(true);
-    setActionMsg(null);
-    setActionError(null);
+    setSubmitting(true); setActionMsg(null); setActionError(null);
     try {
       await signDocument(Number(id), {
         nguoiKyId: currentUser.id,
@@ -161,18 +123,14 @@ export default function DocumentDetail() {
         ghiChu: signNote.trim() || undefined,
       });
       setActionMsg("Ký số thành công!");
-      setShowSignModal(false);
-      setSignNote("");
+      setShowSignModal(false); setSignNote("");
       setDoc((prev) => prev ? { ...prev, daKySo: true, trangThai: 4 } : prev);
-      // Reload signature info
       getSignatureInfo(Number(id))
         .then((r) => setSignatureInfo((r as { data: SignatureInfo | null }).data ?? null))
         .catch(() => null);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Ký số thất bại");
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const canSign =
@@ -191,125 +149,114 @@ export default function DocumentDetail() {
         </div>
       </div>
 
-      {loading && <div className="card">Đang tải...</div>}
-      {error && <div className="card" style={{ color: "#ef4444" }}>{error}</div>}
-      {actionMsg && <div className="card" style={{ background: "#dcfce7", color: "#16a34a", marginBottom: 12 }}>{actionMsg}</div>}
-      {actionError && <div className="card" style={{ background: "#fef2f2", color: "#ef4444", marginBottom: 12 }}>{actionError}</div>}
+      {actionMsg && <div className="alert alert--success" style={{ marginBottom: 16 }}>{actionMsg}</div>}
+      {actionError && <div className="alert alert--error" style={{ marginBottom: 16 }}>{actionError}</div>}
+
+      {loading && (
+        <div className="card">
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tải chi tiết văn bản...</p>
+          </div>
+        </div>
+      )}
+      {error && <div className="alert alert--error">{error}</div>}
 
       {!loading && !error && doc && (
         <div className="grid-2">
           {/* LEFT COLUMN */}
-          <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div className="card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
                 <div>
-                  <h3 style={{ margin: 0 }}>{doc.soKyHieu || `VB-${doc.id}`}</h3>
-                  <p style={{ fontWeight: 500, margin: "4px 0 0" }}>{doc.trichYeu}</p>
+                  <h2 style={{ fontSize: 18, marginBottom: 6 }}>{doc.soKyHieu || `VB-${doc.id}`}</h2>
+                  <p style={{ fontWeight: 500, color: "var(--text)", fontSize: 14 }}>{doc.trichYeu}</p>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}>
                   {doc.daKySo && (
                     <button
                       className="badge badge--success"
-                      style={{ cursor: "pointer", border: "none", background: "#dcfce7" }}
+                      style={{ cursor: "pointer", border: "none" }}
                       onClick={() => setShowSigInfoModal(true)}
-                      title="Xem thông tin chữ ký số"
                     >
-                      Đã ký số
+                      ✍️ Đã ký số
                     </button>
                   )}
                   {doc.aiPhanLoai && (
                     <span
                       className="badge badge--info"
                       title={doc.aiConfidence != null ? `Độ tin cậy: ${Math.round(doc.aiConfidence * 100)}%` : "AI gợi ý phân loại"}
-                      style={{ cursor: "default" }}
                     >
-                      AI: {doc.aiPhanLoai}
+                      🤖 AI: {doc.aiPhanLoai}
                       {doc.aiConfidence != null && (
-                        <span style={{ marginLeft: 4, opacity: 0.75, fontSize: 11 }}>
+                        <span style={{ opacity: 0.75, fontSize: 11, marginLeft: 3 }}>
                           ({Math.round(doc.aiConfidence * 100)}%)
                         </span>
                       )}
                     </span>
                   )}
                   {oneDriveUrl && (
-                    <a
-                      href={oneDriveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="button secondary"
-                      style={{ fontSize: 13, padding: "4px 12px", textDecoration: "none" }}
-                    >
-                      Mở trong Word Online
+                    <a href={oneDriveUrl} target="_blank" rel="noopener noreferrer" className="btn-xs btn-xs--ghost">
+                      📝 Word Online
                     </a>
                   )}
                   {canSign && (
-                    <button
-                      className="button"
-                      style={{ fontSize: 13, padding: "4px 12px" }}
-                      onClick={() => { setShowSignModal(true); setActionError(null); }}
-                    >
-                      Ký số
+                    <button className="button" style={{ fontSize: 13, padding: "6px 14px" }}
+                      onClick={() => { setShowSignModal(true); setActionError(null); }}>
+                      ✍️ Ký số
                     </button>
                   )}
                 </div>
               </div>
-              <hr />
-              <table style={{ width: "100%", fontSize: 14 }}>
+
+              <table className="doc-meta-table">
                 <tbody>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Loại văn bản</td><td>{doc.tenLoaiVanBan || "-"}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Nơi gửi</td><td>{doc.donViBanHanh || "-"}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Người ký</td><td>{doc.nguoiKy || "-"}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Ngày tiếp nhận</td><td>{formatDate(doc.ngayTiepNhan)}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Ngày văn bản</td><td>{formatDate(doc.ngayVanBan)}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Độ khẩn</td><td>{doc.doKhan || "-"}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Độ mật</td><td>{doc.doMat || "-"}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Hạn xử lý</td><td>{formatDate(doc.hanXuLy)}</td></tr>
-                  <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Trạng thái</td><td>{stt ? <span className={stt.className}>{stt.label}</span> : "-"}</td></tr>
+                  {[
+                    { label: "Loại văn bản", value: doc.tenLoaiVanBan || "-" },
+                    { label: "Nơi gửi", value: doc.donViBanHanh || "-" },
+                    { label: "Người ký", value: doc.nguoiKy || "-" },
+                    { label: "Ngày tiếp nhận", value: formatDate(doc.ngayTiepNhan) },
+                    { label: "Ngày văn bản", value: formatDate(doc.ngayVanBan) },
+                    { label: "Độ khẩn", value: doc.doKhan || "-" },
+                    { label: "Độ mật", value: doc.doMat || "-" },
+                    { label: "Hạn xử lý", value: formatDate(doc.hanXuLy) },
+                    { label: "Trạng thái", value: stt ? <span className={stt.className}>{stt.label}</span> : "-" },
+                  ].map(({ label, value }) => (
+                    <tr key={label}>
+                      <td>{label}</td>
+                      <td>{value}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Nội dung */}
-            <div className="card">
-              <h3>Nội dung</h3>
-              <p>{doc.trichYeu}</p>
-            </div>
-
-            {/* Approve / Reject */}
             {pendingApproval && (
               <div className="card">
                 <h3>Phê duyệt</h3>
-                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
-                  Bạn có văn bản cần phê duyệt
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+                  Văn bản này đang chờ phê duyệt của bạn.
                 </p>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    className="button"
-                    onClick={handleApprove}
-                    disabled={submitting}
-                  >
-                    {submitting ? "Đang xử lý..." : "Phê duyệt"}
+                  <button className="button" onClick={handleApprove} disabled={submitting}>
+                    {submitting ? "Đang xử lý..." : "✅ Phê duyệt"}
                   </button>
-                  <button
-                    className="button secondary"
-                    onClick={() => { setShowRejectInput(true); setActionError(null); }}
-                    disabled={submitting}
-                  >
-                    Từ chối
+                  <button className="button secondary" onClick={() => { setShowRejectInput(true); setActionError(null); }} disabled={submitting}>
+                    🚫 Từ chối
                   </button>
                 </div>
                 {showRejectInput && (
-                  <div style={{ marginTop: 12 }}>
+                  <div style={{ marginTop: 14 }}>
                     <textarea
-                      className="input"
+                      className="form-control"
                       placeholder="Nhập lý do từ chối..."
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
                       rows={3}
-                      style={{ width: "100%", marginBottom: 8 }}
+                      style={{ marginBottom: 10 }}
                     />
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button className="button" onClick={handleReject} disabled={submitting}>Xác nhận từ chối</button>
+                      <button className="button danger" onClick={handleReject} disabled={submitting}>Xác nhận từ chối</button>
                       <button className="button secondary" onClick={() => { setShowRejectInput(false); setRejectReason(""); setActionError(null); }}>Hủy</button>
                     </div>
                   </div>
@@ -319,32 +266,28 @@ export default function DocumentDetail() {
           </div>
 
           {/* RIGHT COLUMN */}
-          <div>
-            {/* File attachments */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div className="card">
               <h3>Tệp đính kèm</h3>
               {attachments.length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Không có tệp đính kèm.</p>
+                <div className="empty-state" style={{ padding: "24px 0" }}>
+                  <div className="empty-state__icon">📂</div>
+                  <p>Không có tệp đính kèm.</p>
+                </div>
               ) : (
-                <table className="table" style={{ width: "100%" }}>
+                <table className="table">
                   <thead>
                     <tr>
-                      <th>Tên tệp</th>
-                      <th style={{ whiteSpace: "nowrap" }}>Kích thước</th>
-                      <th style={{ whiteSpace: "nowrap" }}>Tải xuống</th>
+                      <th>Tên tệp</th><th>Kích thước</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {attachments.map((f) => (
                       <tr key={f.id}>
-                        <td style={{ fontSize: 13 }}>{f.tenTep}</td>
+                        <td style={{ fontSize: 13 }}>📄 {f.tenTep}</td>
                         <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>{formatSize(f.kichThuoc)}</td>
                         <td>
-                          <button
-                            className="button secondary"
-                            style={{ fontSize: 12, padding: "4px 10px" }}
-                            onClick={() => triggerDownload(f.id, f.tenTep)}
-                          >
+                          <button className="btn-xs btn-xs--primary" onClick={() => triggerDownload(f.id, f.tenTep)}>
                             Tải xuống
                           </button>
                         </td>
@@ -355,126 +298,99 @@ export default function DocumentDetail() {
               )}
             </div>
 
-            {/* Workflow timeline */}
             <div className="card">
               <h3>Lịch sử xử lý</h3>
               {timeline.length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Chưa có dữ liệu xử lý.</p>
+                <div className="empty-state" style={{ padding: "24px 0" }}>
+                  <div className="empty-state__icon">📋</div>
+                  <p>Chưa có dữ liệu xử lý.</p>
+                </div>
               ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                <div className="timeline">
                   {timeline.map((item, idx) => (
-                    <li
-                      key={item.processingId || idx}
-                      style={{
-                        padding: "8px 0",
-                        borderBottom: idx < timeline.length - 1 ? "1px solid var(--border)" : "none",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <span style={{ fontWeight: 500 }}>{item.tenBuoc}</span>
-                          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                            {item.hanhDongXuLy || "-"}
-                          </div>
-                          {item.yKienXuLy && (
-                            <div style={{ fontSize: 12, fontStyle: "italic", marginTop: 2 }}>
-                              "{item.yKienXuLy}"
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ textAlign: "right", fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                          <div>{item.ngayNhan ? formatDate(item.ngayNhan) : "-"}</div>
-                          {item.nguoiXuLy && <div>{item.nguoiXuLy}</div>}
-                        </div>
+                    <div key={item.processingId || idx} className="timeline-item">
+                      <div className={`timeline-dot ${item.hanhDongXuLy ? "timeline-dot--done" : "timeline-dot--active"}`}>
+                        {item.hanhDongXuLy ? "✓" : "●"}
                       </div>
-                    </li>
+                      <div className="timeline-content">
+                        <h4>{item.tenBuoc}</h4>
+                        <p>{item.hanhDongXuLy || "Đang xử lý"}</p>
+                        {item.yKienXuLy && (
+                          <p style={{ fontStyle: "italic", marginTop: 2, fontSize: 12 }}>"{item.yKienXuLy}"</p>
+                        )}
+                        <p style={{ marginTop: 4 }}>
+                          {item.ngayNhan ? formatDate(item.ngayNhan) : ""}
+                          {item.nguoiXuLy && ` · ${item.nguoiXuLy}`}
+                        </p>
+                      </div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Digital sign confirmation modal */}
       {showSignModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-        }}>
-          <div className="card" style={{ maxWidth: 420, width: "100%", margin: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Xác nhận ký số</h3>
-            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              Chữ ký số sẽ được ghi nhận kèm theo hash SHA-256 của tệp đính kèm đầu tiên.
-            </p>
-            <label style={{ fontSize: 13, fontWeight: 500 }}>Ghi chú (tùy chọn)</label>
-            <textarea
-              className="input"
-              placeholder="Nhập ghi chú..."
-              value={signNote}
-              onChange={(e) => setSignNote(e.target.value)}
-              rows={3}
-              style={{ width: "100%", margin: "6px 0 12px" }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
+        <div className="modal-overlay" onClick={() => { setShowSignModal(false); setSignNote(""); setActionError(null); }}>
+          <div className="modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>✍️ Xác nhận ký số</h3>
+              <button className="modal-close" onClick={() => { setShowSignModal(false); setSignNote(""); }}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert--info">
+                Chữ ký số sẽ được ghi nhận kèm theo hash SHA-256 của tệp đính kèm đầu tiên.
+              </div>
+              <div className="form-field">
+                <label className="form-label">Ghi chú (tùy chọn)</label>
+                <textarea className="form-control" placeholder="Nhập ghi chú..." rows={3}
+                  value={signNote} onChange={(e) => setSignNote(e.target.value)} />
+              </div>
+              {actionError && <div className="alert alert--error">{actionError}</div>}
+            </div>
+            <div className="modal-footer">
+              <button className="button secondary" onClick={() => { setShowSignModal(false); setSignNote(""); setActionError(null); }} disabled={submitting}>
+                Hủy
+              </button>
               <button className="button" onClick={handleSign} disabled={submitting}>
                 {submitting ? "Đang ký..." : "Xác nhận ký số"}
-              </button>
-              <button
-                className="button secondary"
-                onClick={() => { setShowSignModal(false); setSignNote(""); setActionError(null); }}
-                disabled={submitting}
-              >
-                Hủy
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Signature info modal */}
       {showSigInfoModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-        }}>
-          <div className="card" style={{ maxWidth: 480, width: "100%", margin: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Thông tin chữ ký số</h3>
-            {signatureInfo ? (
-              <table style={{ width: "100%", fontSize: 14 }}>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Người ký</td>
-                    <td>{signatureInfo.nguoiKyId ?? "-"}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Thời gian ký</td>
-                    <td>{formatDateTime(signatureInfo.ngayKy)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Loại ký</td>
-                    <td>{signatureInfo.loaiKy || "-"}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Ghi chú</td>
-                    <td>{signatureInfo.ghiChu || "-"}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Hash file</td>
-                    <td style={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: 12 }}>
-                      {signatureInfo.hashFile || "Không có tệp đính kèm"}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px 4px 0", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Chứng chỉ</td>
-                    <td>{signatureInfo.certInfo || "-"}</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <p style={{ color: "var(--text-muted)" }}>Không có thông tin chữ ký.</p>
-            )}
-            <div style={{ marginTop: 16 }}>
+        <div className="modal-overlay" onClick={() => setShowSigInfoModal(false)}>
+          <div className="modal-card" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>✍️ Thông tin chữ ký số</h3>
+              <button className="modal-close" onClick={() => setShowSigInfoModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {signatureInfo ? (
+                <table className="doc-meta-table">
+                  <tbody>
+                    <tr><td>Người ký</td><td>{signatureInfo.nguoiKyId ?? "-"}</td></tr>
+                    <tr><td>Thời gian ký</td><td>{formatDateTime(signatureInfo.ngayKy)}</td></tr>
+                    <tr><td>Loại ký</td><td>{signatureInfo.loaiKy || "-"}</td></tr>
+                    <tr><td>Ghi chú</td><td>{signatureInfo.ghiChu || "-"}</td></tr>
+                    <tr>
+                      <td>Hash file</td>
+                      <td style={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: 12 }}>
+                        {signatureInfo.hashFile || "Không có tệp đính kèm"}
+                      </td>
+                    </tr>
+                    <tr><td>Chứng chỉ</td><td>{signatureInfo.certInfo || "-"}</td></tr>
+                  </tbody>
+                </table>
+              ) : (
+                <p style={{ color: "var(--text-muted)" }}>Không có thông tin chữ ký.</p>
+              )}
+            </div>
+            <div className="modal-footer">
               <button className="button secondary" onClick={() => setShowSigInfoModal(false)}>Đóng</button>
             </div>
           </div>

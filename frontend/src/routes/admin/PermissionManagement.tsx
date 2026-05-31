@@ -103,7 +103,7 @@ export default function PermissionManagement() {
   const currentPermissions = useMemo(() => rolePermissions?.permissions || [], [rolePermissions]);
 
   if (loading) {
-    return <div className="admin-loading">Đang tải phân quyền...</div>;
+    return <div className="admin-loading"><div className="admin-spinner" /><span>Đang tải phân quyền...</span></div>;
   }
 
   if (error) {
@@ -121,7 +121,7 @@ export default function PermissionManagement() {
         >
           💾 Lưu thay đổi
         </button>
-      </div>
+      </span></div>
 
       <div className="role-selector">
         <label>Chọn nhóm quyền:</label>
@@ -135,8 +135,8 @@ export default function PermissionManagement() {
               {role.tenNhomQuyen}
             </button>
           ))}
-        </div>
-      </div>
+        </span></div>
+      </span></div>
 
       {rolePermissions && (
         <div className="permissions-table-wrapper">
@@ -194,8 +194,8 @@ export default function PermissionManagement() {
               ))}
             </tbody>
           </table>
-        </div>
+        </span></div>
       )}
-    </div>
+    </span></div>
   );
 }

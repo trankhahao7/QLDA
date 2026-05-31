@@ -85,24 +85,24 @@ export default function Dashboard() {
       )}
 
       <div className="grid-4">
-        <div className="card">
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Văn bản đến</p>
-          <h2 style={{ margin: 0 }}>{stats?.incomingDocuments ?? 0}</h2>
+        <div className="stat-card-user stat-card-user--info">
+          <div className="stat-card-user__label">📥 Văn bản đến</div>
+          <div className="stat-card-user__value">{stats?.incomingDocuments ?? 0}</div>
           <span className="badge badge--info">Cần xử lý</span>
         </div>
-        <div className="card">
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Đang xử lý</p>
-          <h2 style={{ margin: 0 }}>{stats?.processingDocuments ?? 0}</h2>
+        <div className="stat-card-user stat-card-user--warning">
+          <div className="stat-card-user__label">🔄 Đang xử lý</div>
+          <div className="stat-card-user__value">{stats?.processingDocuments ?? 0}</div>
           <span className="badge badge--warning">Đang tiến hành</span>
         </div>
-        <div className="card">
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Cần phê duyệt</p>
-          <h2 style={{ margin: 0 }}>{pendingApprovals.length}</h2>
+        <div className="stat-card-user stat-card-user--primary">
+          <div className="stat-card-user__label">✅ Cần phê duyệt</div>
+          <div className="stat-card-user__value">{pendingApprovals.length}</div>
           <span className="badge badge--primary">Chờ duyệt</span>
         </div>
-        <div className="card">
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Đã hoàn tất</p>
-          <h2 style={{ margin: 0 }}>{stats?.completedDocuments ?? 0}</h2>
+        <div className="stat-card-user stat-card-user--success">
+          <div className="stat-card-user__label">🏁 Đã hoàn tất</div>
+          <div className="stat-card-user__value">{stats?.completedDocuments ?? 0}</div>
           <span className="badge badge--success">Hoàn thành</span>
         </div>
       </div>

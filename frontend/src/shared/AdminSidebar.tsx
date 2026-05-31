@@ -12,19 +12,22 @@ const adminNavItems = [
   { to: "/admin/reports", label: "Báo cáo & Thống kê", icon: "📈" },
   { to: "/admin/monitoring", label: "Giám sát hệ thống", icon: "🖥️" },
   { to: "/admin/audit-logs", label: "Nhật ký hệ thống", icon: "📝" },
-  { to: "/dashboard", label: "Quay lại người dùng", icon: "←" },
 ];
 
 export default function AdminSidebar() {
   return (
     <aside className="admin-sidebar">
       <div className="admin-sidebar__brand">
-        <h2>⚙️ Admin Panel</h2>
-        <span>Quản trị hệ thống</span>
+        <div className="admin-sidebar__brand-icon">⚙️</div>
+        <div>
+          <h2>Admin Panel</h2>
+          <span>Quản trị hệ thống</span>
+        </div>
       </div>
 
       <nav className="admin-sidebar__nav">
-        {adminNavItems.map((item) => (
+        <span className="admin-nav-section">Quản lý</span>
+        {adminNavItems.slice(0, 6).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -34,13 +37,35 @@ export default function AdminSidebar() {
           >
             <span className="icon">{item.icon}</span>
             <span>{item.label}</span>
-            <span className="arrow" aria-hidden>→</span>
           </NavLink>
         ))}
+
+        <span className="admin-nav-section">Vận hành</span>
+        {adminNavItems.slice(6).map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              isActive ? "admin-nav-link active" : "admin-nav-link"
+            }
+          >
+            <span className="icon">{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+
+        <div style={{ height: 1, background: "rgba(255,255,255,0.12)", margin: "12px 0" }} />
+        <NavLink
+          to="/dashboard"
+          className="admin-nav-link"
+        >
+          <span className="icon">🏠</span>
+          <span>Quay lại người dùng</span>
+        </NavLink>
       </nav>
 
       <div className="admin-sidebar__footer">
-        <p>Admin System v1.0</p>
+        <p>eOIS Admin v1.0</p>
       </div>
     </aside>
   );

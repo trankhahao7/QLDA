@@ -141,13 +141,13 @@ export default function UnitManagement() {
 
   if (loading) {
     return (
-      <div className="admin-loading">Đang tải đơn vị...</div>
+      <div className="admin-loading"><div className="admin-spinner" /><span>Đang tải đơn vị...</span></div>
     );
   }
 
   if (error) {
     return (
-      <div className="admin-loading">{error}</div>
+      <div className="admin-loading">{error}</span></div>
     );
   }
 
@@ -161,7 +161,7 @@ export default function UnitManagement() {
         >
           + Thêm đơn vị
         </button>
-      </div>
+      </span></div>
 
       <div className="admin-filters">
         <input
@@ -171,7 +171,7 @@ export default function UnitManagement() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
-      </div>
+      </span></div>
 
       {showForm && (
         <div className="admin-form-modal">
@@ -196,7 +196,7 @@ export default function UnitManagement() {
                     placeholder="VD: PHIT"
                     className="form-input"
                   />
-                </div>
+                </span></div>
                 <div className="form-group">
                   <label>Tên đơn vị *</label>
                   <input
@@ -211,8 +211,8 @@ export default function UnitManagement() {
                     placeholder="Tên đơn vị"
                     className="form-input"
                   />
-                </div>
-              </div>
+                </span></div>
+              </span></div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Đơn vị cha</label>
@@ -235,7 +235,7 @@ export default function UnitManagement() {
                         </option>
                       ))}
                   </select>
-                </div>
+                </span></div>
                 <div className="form-group">
                   <label>Điện thoại</label>
                   <input
@@ -250,8 +250,8 @@ export default function UnitManagement() {
                     placeholder="0234567890"
                     className="form-input"
                   />
-                </div>
-              </div>
+                </span></div>
+              </span></div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Email</label>
@@ -264,8 +264,8 @@ export default function UnitManagement() {
                     placeholder="unit@example.com"
                     className="form-input"
                   />
-                </div>
-              </div>
+                </span></div>
+              </span></div>
               <div className="form-group">
                 <label>Địa chỉ</label>
                 <input
@@ -277,7 +277,7 @@ export default function UnitManagement() {
                   placeholder="Địa chỉ đơn vị"
                   className="form-input"
                 />
-              </div>
+              </span></div>
               <div className="form-group checkbox">
                 <input
                   type="checkbox"
@@ -288,7 +288,7 @@ export default function UnitManagement() {
                   }
                 />
                 <label htmlFor="suDung">Sử dụng</label>
-              </div>
+              </span></div>
               <div className="form-actions">
                 <button
                   type="button"
@@ -304,10 +304,10 @@ export default function UnitManagement() {
                 >
                   Hủy
                 </button>
-              </div>
+              </span></div>
             </form>
-          </div>
-        </div>
+          </span></div>
+        </span></div>
       )}
 
       <table className="admin-table">
@@ -362,7 +362,7 @@ export default function UnitManagement() {
 
       <div className="pagination">
         <p>Tổng: {filteredUnits.length} đơn vị</p>
-      </div>
-    </div>
+      </span></div>
+    </span></div>
   );
 }

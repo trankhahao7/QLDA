@@ -209,13 +209,13 @@ export default function WorkflowManagement() {
 
   if (loading) {
     return (
-      <div className="admin-loading">Đang tải quy trình...</div>
+      <div className="admin-loading"><div className="admin-spinner" /><span>Đang tải quy trình...</span></div>
     );
   }
 
   if (error) {
     return (
-      <div className="admin-loading">{error}</div>
+      <div className="admin-loading">{error}</span></div>
     );
   }
 
@@ -229,7 +229,7 @@ export default function WorkflowManagement() {
         >
           + Thêm quy trình
         </button>
-      </div>
+      </span></div>
 
       {showForm && (
         <div className="admin-form-modal">
@@ -256,7 +256,7 @@ export default function WorkflowManagement() {
                     placeholder="VD: QT001"
                     className="form-input"
                   />
-                </div>
+                </span></div>
                 <div className="form-group">
                   <label>Tên quy trình *</label>
                   <input
@@ -271,8 +271,8 @@ export default function WorkflowManagement() {
                     placeholder="Tên quy trình"
                     className="form-input"
                   />
-                </div>
-              </div>
+                </span></div>
+              </span></div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Loại văn bản</label>
@@ -293,7 +293,7 @@ export default function WorkflowManagement() {
                       </option>
                     ))}
                   </select>
-                </div>
+                </span></div>
                 <div className="form-group checkbox">
                   <input
                     type="checkbox"
@@ -304,8 +304,8 @@ export default function WorkflowManagement() {
                     }
                   />
                   <label htmlFor="suDung">Sử dụng</label>
-                </div>
-              </div>
+                </span></div>
+              </span></div>
 
               <div className="form-group">
                 <label>Các bước quy trình</label>
@@ -379,9 +379,9 @@ export default function WorkflowManagement() {
                       >
                         Xóa
                       </button>
-                    </div>
+                    </span></div>
                   ))}
-                </div>
+                </span></div>
                 <button
                   type="button"
                   className="button secondary"
@@ -389,7 +389,7 @@ export default function WorkflowManagement() {
                 >
                   + Thêm bước
                 </button>
-              </div>
+              </span></div>
 
               <div className="form-actions">
                 <button
@@ -406,10 +406,10 @@ export default function WorkflowManagement() {
                 >
                   Hủy
                 </button>
-              </div>
+              </span></div>
             </form>
-          </div>
-        </div>
+          </span></div>
+        </span></div>
       )}
 
       <div className="workflows-list">
@@ -421,7 +421,7 @@ export default function WorkflowManagement() {
                 <p className="workflow-meta">
                   Mã: {workflow.maQuyTrinh} | Loại: {workflow.loaiVanBanId ? typeNameById.get(workflow.loaiVanBanId) : "-"}
                 </p>
-              </div>
+              </span></div>
               <div className="workflow-status">
                 <span
                   className={`badge ${
@@ -430,8 +430,8 @@ export default function WorkflowManagement() {
                 >
                   {workflow.suDung ? "Sử dụng" : "Không sử dụng"}
                 </span>
-              </div>
-            </div>
+              </span></div>
+            </span></div>
 
             {expandedWorkflow === workflow.id && workflow.steps && (
               <div className="workflow-steps">
@@ -444,10 +444,10 @@ export default function WorkflowManagement() {
                         Vai trò: {step.vaiTroXuLy || "-"} • Thời gian: {step.thoiGianXuLy || 0} giờ
                         {step.batBuocPheDuyet && " • Bắt buộc"}
                       </p>
-                    </div>
-                  </div>
+                    </span></div>
+                  </span></div>
                 ))}
-              </div>
+              </span></div>
             )}
 
             <div className="workflow-actions">
@@ -469,10 +469,10 @@ export default function WorkflowManagement() {
               >
                 Xóa
               </button>
-            </div>
-          </div>
+            </span></div>
+          </span></div>
         ))}
-      </div>
-    </div>
+      </span></div>
+    </span></div>
   );
 }

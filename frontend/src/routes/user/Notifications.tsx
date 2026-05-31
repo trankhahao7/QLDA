@@ -15,9 +15,22 @@ const LOAI_MAP: Record<string, string> = {
   TRANSFER: "Luân chuyển",
 };
 
+const LOAI_ICON: Record<string, string> = {
+  SYSTEM: "⚙️",
+  APPROVAL: "✅",
+  REMINDER: "⏰",
+  SLA: "📊",
+  TRANSFER: "📤",
+};
+
 function getLoaiLabel(loai?: string) {
   if (!loai) return null;
   return LOAI_MAP[loai] ?? loai;
+}
+
+function getLoaiIcon(loai?: string) {
+  if (!loai) return "🔔";
+  return LOAI_ICON[loai] ?? "🔔";
 }
 
 type FilterTab = "all" | "unread";
@@ -74,7 +87,7 @@ export default function Notifications() {
         prev.map((n) => (n.id === item.id ? { ...n, daDoc: true } : n))
       );
     } catch {
-      // silently ignore single mark-read failures
+      // silently ignore
     }
   };
 
@@ -97,18 +110,8 @@ export default function Notifications() {
       <div className="topbar">
         <div className="topbar__title">
           <h1>
-            Thông báo{" "}
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  background: "#ef4444", color: "#fff", borderRadius: "50%",
-                  width: 22, height: 22, fontSize: 12, fontWeight: 700, marginLeft: 8,
-                }}
-              >
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
+            Thông báo
+            {unreadCount > 0 && <span className="count-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </h1>
           <p>Các thông báo từ hệ thống và quy trình xử lý.</p>
         </div>
@@ -124,73 +127,66 @@ export default function Notifications() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button
-          type="button"
-          className={filter === "all" ? "button" : "button secondary"}
-          onClick={() => handleFilterChange("all")}
-          style={{ fontSize: 13 }}
-        >
-          Tất cả ({items.length})
-        </button>
-        <button
-          type="button"
-          className={filter === "unread" ? "button" : "button secondary"}
-          onClick={() => handleFilterChange("unread")}
-          style={{ fontSize: 13 }}
-        >
-          Chưa đọc ({unreadCount})
-        </button>
+      <div className="filter-bar">
+        <div className="filter-tabs">
+          <button
+            type="button"
+            className={`filter-tab${filter === "all" ? " active" : ""}`}
+            onClick={() => handleFilterChange("all")}
+          >
+            Tất cả ({items.length})
+          </button>
+          <button
+            type="button"
+            className={`filter-tab${filter === "unread" ? " active" : ""}`}
+            onClick={() => handleFilterChange("unread")}
+          >
+            Chưa đọc ({unreadCount})
+          </button>
+        </div>
       </div>
 
-      <div className="card">
+      {error && <div className="alert alert--error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tải thông báo...</p>
+          </div>
         )}
-        {error && <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>}
+
         {!loading && !error && displayedItems.length === 0 && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>
-            {filter === "unread" ? "Không có thông báo chưa đọc." : "Chưa có thông báo nào."}
-          </p>
+          <div className="empty-state">
+            <div className="empty-state__icon">🔔</div>
+            <h3>{filter === "unread" ? "Không có thông báo chưa đọc" : "Chưa có thông báo nào"}</h3>
+            <p>Thông báo từ hệ thống và quy trình sẽ xuất hiện tại đây.</p>
+          </div>
         )}
 
         {displayedItems.length > 0 && (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          <ul className="notif-list">
             {displayedItems.map((item) => (
               <li
                 key={item.id}
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 12,
-                  padding: "14px 16px",
-                  borderBottom: "1px solid var(--border-color, #e5e7eb)",
-                  background: item.daDoc ? "transparent" : "rgba(59,130,246,0.04)",
-                  cursor: item.daDoc ? "default" : "pointer",
-                }}
+                className={`notif-item${!item.daDoc ? " notif-item--unread" : ""}`}
                 onClick={() => handleMarkRead(item)}
               >
-                <div
-                  style={{
-                    flexShrink: 0, width: 8, height: 8, borderRadius: "50%",
-                    background: item.daDoc ? "transparent" : "#3b82f6",
-                    marginTop: 6,
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontWeight: item.daDoc ? 400 : 600, fontSize: 14 }}>
-                      {item.tieuDe}
-                    </span>
+                <div style={{ font: "22px/1 serif", width: 32, textAlign: "center", flexShrink: 0, paddingTop: 2 }}>
+                  {getLoaiIcon(item.loaiThongBao)}
+                </div>
+                <div className="notif-content">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                    <span className="notif-title">{item.tieuDe}</span>
                     {item.loaiThongBao && (
-                      <span className="badge badge--ghost" style={{ fontSize: 11 }}>
+                      <span className="badge badge--ghost" style={{ fontSize: 10.5 }}>
                         {getLoaiLabel(item.loaiThongBao)}
                       </span>
                     )}
                   </div>
-                  <p style={{ margin: 0, fontSize: 13, color: "var(--text-muted, #6b7280)" }}>
-                    {item.noiDung}
-                  </p>
+                  <p className="notif-body">{item.noiDung}</p>
                   {item.ngayGui && (
-                    <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted, #9ca3af)" }}>
+                    <p className="notif-meta">
                       {new Date(item.ngayGui).toLocaleString("vi-VN")}
                     </p>
                   )}
@@ -198,8 +194,8 @@ export default function Notifications() {
                 {!item.daDoc && (
                   <button
                     type="button"
-                    className="button secondary"
-                    style={{ fontSize: 11, padding: "2px 8px", flexShrink: 0 }}
+                    className="btn-xs btn-xs--ghost"
+                    style={{ flexShrink: 0 }}
                     onClick={(e) => { e.stopPropagation(); handleMarkRead(item); }}
                   >
                     Đã đọc

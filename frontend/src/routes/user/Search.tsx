@@ -14,13 +14,8 @@ const TRANG_THAI_MAP: Record<number, { label: string; className: string }> = {
 };
 
 interface VanBanTimKiem {
-  id: number;
-  soKyHieu: string;
-  trichYeu: string;
-  tenLoaiVanBan?: string;
-  donViBanHanh: string;
-  ngayTiepNhan: string;
-  trangThai: number;
+  id: number; soKyHieu: string; trichYeu: string;
+  tenLoaiVanBan?: string; donViBanHanh: string; ngayTiepNhan: string; trangThai: number;
 }
 
 export default function Search() {
@@ -37,30 +32,21 @@ export default function Search() {
     setLoading(true);
     setSearched(true);
     setError(null);
-
     try {
-      // TODO: map donVi filter to donViChuTriId once UI uses unit IDs.
       const response = await searchIncomingDocuments({
-        page: 0,
-        size: 20,
+        page: 0, size: 20,
         keyword: keyword || undefined,
         trangThai: status ? Number(status) : undefined,
       });
-
-        setResults(
-          (response.content || []).map((item: DocumentListItem) => ({
-            id: item.id,
-            soKyHieu: item.soKyHieu || "-",
-            trichYeu: item.trichYeu,
-            tenLoaiVanBan: item.tenLoaiVanBan,
-            donViBanHanh: item.donViBanHanh || "-",
-            ngayTiepNhan: item.ngayTiepNhan || "",
-            trangThai: item.trangThai ?? -1,
-          }))
-        );
+      setResults(
+        (response.content || []).map((item: DocumentListItem) => ({
+          id: item.id, soKyHieu: item.soKyHieu || "-", trichYeu: item.trichYeu,
+          tenLoaiVanBan: item.tenLoaiVanBan, donViBanHanh: item.donViBanHanh || "-",
+          ngayTiepNhan: item.ngayTiepNhan || "", trangThai: item.trangThai ?? -1,
+        }))
+      );
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Không thể tìm kiếm";
-      setError(message);
+      setError(err instanceof ApiError ? err.message : "Không thể tìm kiếm");
       setResults([]);
     } finally {
       setLoading(false);
@@ -74,91 +60,93 @@ export default function Search() {
           <h1>Tìm kiếm văn bản</h1>
           <p>Tìm theo từ khóa, phòng ban hoặc trạng thái xử lý.</p>
         </div>
-        <div className="topbar__actions">
-          <button className="button secondary" type="button">
-            Lọc nâng cao
-          </button>
-        </div>
       </div>
 
-      <div className="card">
-        <form className="form-grid" onSubmit={handleSearch}>
-          <label>
-            Từ khóa
+      <div className="card" style={{ marginBottom: 20 }}>
+        <form onSubmit={handleSearch}>
+          <div className="filter-bar" style={{ marginBottom: 16 }}>
             <input
-              placeholder="Nhập từ khóa văn bản"
+              type="text"
+              className="form-control"
+              placeholder="🔍  Nhập từ khóa văn bản..."
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
+              style={{ flex: 1, minWidth: 240 }}
             />
-          </label>
-          <label>
-            Phòng ban
-            <select value={donVi} onChange={(e) => setDonVi(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option value="Phòng Kế hoạch">Phòng Kế hoạch</option>
-              <option value="Sở Xây dựng">Sở Xây dựng</option>
-              <option value="Tư vấn giám sát">Tư vấn giám sát</option>
-            </select>
-          </label>
-          <label>
-            Trạng thái
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">Tất cả</option>
+            <select className="form-control" style={{ minWidth: 160 }} value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Tất cả trạng thái</option>
               <option value="1">Đang xử lý</option>
-              <option value="2">Hoàn thành</option>
+              <option value="2">Đã chuyển xử lý</option>
+              <option value="4">Đã ký</option>
+              <option value="5">Đã phát hành</option>
             </select>
-          </label>
-          <button className="button" type="submit" disabled={loading}>
-            {loading ? "Đang tìm..." : "Tìm kiếm"}
-          </button>
+            <button className="button" type="submit" disabled={loading}>
+              {loading ? "Đang tìm..." : "Tìm kiếm"}
+            </button>
+          </div>
         </form>
       </div>
 
-      <div className="card" style={{ marginTop: 20 }}>
-        {!searched ? (
-          <p style={{ textAlign: "center", color: "var(--text-muted)" }}>
-            Nhập tiêu chí tìm kiếm để bắt đầu
-          </p>
-        ) : loading ? (
-          <p style={{ textAlign: "center" }}>Đang tải...</p>
-        ) : error ? (
-          <p style={{ textAlign: "center" }}>{error}</p>
-        ) : results.length === 0 ? (
-          <p style={{ textAlign: "center" }}>Không tìm thấy kết quả</p>
-        ) : (
-          <table className="table" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th style={{ whiteSpace: "nowrap" }}>Mã</th>
-                <th style={{ whiteSpace: "nowrap" }}>Loại</th>
-                <th>Nội dung</th>
-                <th style={{ whiteSpace: "nowrap" }}>Đơn vị</th>
-                <th style={{ whiteSpace: "nowrap" }}>Ngày</th>
-                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((item) => {
-                const stt = TRANG_THAI_MAP[item.trangThai] ?? { label: "Không xác định", className: "badge badge--ghost" };
-                return (
-                  <tr key={item.id}>
-                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
-                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
-                    <td>
-                      <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
-                    </td>
-                    <td style={{ fontSize: 13 }}>{item.donViBanHanh}</td>
-                    <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
-                      {item.ngayTiepNhan ? new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
-                    </td>
-                    <td>
-                      <span className={stt.className}>{stt.label}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {error && <div className="alert alert--error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      <div className="card">
+        {!searched && (
+          <div className="empty-state">
+            <div className="empty-state__icon">🔍</div>
+            <h3>Nhập từ khóa để tìm kiếm</h3>
+            <p>Tìm văn bản theo trích yếu, số ký hiệu hoặc đơn vị ban hành.</p>
+          </div>
+        )}
+
+        {searched && loading && (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tìm kiếm...</p>
+          </div>
+        )}
+
+        {searched && !loading && !error && results.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-state__icon">📭</div>
+            <h3>Không tìm thấy kết quả</h3>
+            <p>Thử tìm kiếm với từ khóa khác hoặc bỏ bộ lọc trạng thái.</p>
+          </div>
+        )}
+
+        {results.length > 0 && (
+          <>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>
+              Tìm thấy <strong>{results.length}</strong> kết quả
+            </p>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Mã</th><th>Loại</th><th>Nội dung</th><th>Đơn vị</th><th>Ngày</th><th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((item) => {
+                  const stt = TRANG_THAI_MAP[item.trangThai] ?? { label: "Không xác định", className: "badge badge--ghost" };
+                  return (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
+                      <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
+                      <td>
+                        <Link to={`/documents/${item.id}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                          {item.trichYeu}
+                        </Link>
+                      </td>
+                      <td style={{ fontSize: 13 }}>{item.donViBanHanh}</td>
+                      <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
+                        {item.ngayTiepNhan ? new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
+                      </td>
+                      <td><span className={stt.className}>{stt.label}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </section>

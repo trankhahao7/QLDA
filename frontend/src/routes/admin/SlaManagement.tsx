@@ -132,11 +132,7 @@ export default function SlaManagement() {
         </label>
       </div>
 
-      {error && (
-        <div className="card">
-          <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>
-        </div>
-      )}
+      {error && <div className="admin-error">⚠️ {error}</div>}
 
       {selectedWorkflowId && (
         <div className="card">

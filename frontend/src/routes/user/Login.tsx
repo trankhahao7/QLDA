@@ -150,19 +150,20 @@ export default function Login() {
              <img src="https://img.icons8.com/fluency/96/group-task.png" alt="logo" />
           </div>
           <h2>Chào mừng quay trở lại</h2>
-          <p>Sử dụng tài khoản doanh nghiệp để truy cập hệ thống</p>
+          <p>Sử dụng tài khoản doanh nghiệp để đăng nhập vào hệ thống xử lý văn bản điện tử</p>
           {errorMessage && (
-            <div style={{ color: "#b91c1c", background: "#fef2f2", padding: "10px 14px", borderRadius: 6, marginBottom: 16, fontSize: 13, textAlign: "left", border: "1px solid #fca5a5" }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Đăng nhập thất bại</div>
+            <div style={{ color: "#b91c1c", background: "#fef2f2", padding: "12px 14px", borderRadius: 10, marginBottom: 20, fontSize: 13, textAlign: "left", border: "1px solid #fca5a5" }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Đăng nhập thất bại</div>
               <div>{errorMessage}</div>
             </div>
           )}
-          <button className="office-btn azure-btn" onClick={handleAzureLogin} disabled={loading}>
+          <button className="office-btn" onClick={handleAzureLogin} disabled={loading}>
             <img src="https://img.icons8.com/color/48/azure-1.png" alt="Azure AD Icon" />
-            <span>{loading ? "Đang xử lý..." : "Đăng nhập với Azure AD"}</span>
+            <span>{loading ? "Đang xử lý..." : "Đăng nhập với Microsoft Azure AD"}</span>
           </button>
           <div className="login-footer">
-            <p>© 2026 Bản quyền thuộc về eOffice Intelligence System (eOIS)</p>
+            <p>Bảo mật bởi Microsoft Azure Active Directory</p>
+            <p style={{ marginTop: 6 }}>© 2026 eOffice Intelligence System (eOIS)</p>
           </div>
         </div>
       </div>

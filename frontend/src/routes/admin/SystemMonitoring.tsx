@@ -143,7 +143,7 @@ export default function SystemMonitoring() {
 
   if (loading) {
     return (
-      <div className="admin-loading">Đang tải dữ liệu giám sát...</div>
+      <div className="admin-loading"><div className="admin-spinner" /><span>Đang tải dữ liệu giám sát...</span></div>
     );
   }
 
@@ -157,7 +157,7 @@ export default function SystemMonitoring() {
         >
           🔄 Tải lại
         </button>
-      </div>
+      </span></div>
 
       <div className="monitoring-section">
         <h3>Trạng thái dịch vụ</h3>
@@ -169,27 +169,27 @@ export default function SystemMonitoring() {
                   {getStatusIcon(service.status)}
                 </span>
                 <h4>{service.service}</h4>
-              </div>
+              </span></div>
               <div className="service-stats">
                 <div className="stat-row">
                   <span className="label">Trạng thái:</span>
                   <span className="value">
                     {getStatusText(service.status)}
                   </span>
-                </div>
+                </span></div>
                 <div className="stat-row">
                   <span className="label">Uptime:</span>
                   <span className="value">{service.uptime}</span>
-                </div>
+                </span></div>
                 <div className="stat-row">
                   <span className="label">Thời gian response:</span>
                   <span className="value">{service.responseTime}ms</span>
-                </div>
+                </span></div>
                 <div className="stat-row">
                   <span className="label">Kiểm tra lúc:</span>
                   <span className="value">{service.lastCheck}</span>
-                </div>
-              </div>
+                </span></div>
+              </span></div>
               <div className="service-badge">
                 <span
                   className={`badge badge-${
@@ -202,11 +202,11 @@ export default function SystemMonitoring() {
                 >
                   {getStatusText(service.status)}
                 </span>
-              </div>
-            </div>
+              </span></div>
+            </span></div>
           ))}
-        </div>
-      </div>
+        </span></div>
+      </span></div>
 
       <div className="monitoring-section">
         <h3>Hiệu suất hệ thống</h3>
@@ -246,7 +246,7 @@ export default function SystemMonitoring() {
             ))}
           </tbody>
         </table>
-      </div>
+      </span></div>
 
       <div className="monitoring-section">
         <h3>Nhật ký sự kiện gần đây</h3>
@@ -294,7 +294,7 @@ export default function SystemMonitoring() {
             </tr>
           </tbody>
         </table>
-      </div>
-    </div>
+      </span></div>
+    </span></div>
   );
 }

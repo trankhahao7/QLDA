@@ -23,11 +23,7 @@ export default function Delegation() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    nguoiDuocUyQuyenId: "",
-    tuNgay: "",
-    denNgay: "",
-    phamViUyQuyen: "",
-    ghiChu: "",
+    nguoiDuocUyQuyenId: "", tuNgay: "", denNgay: "", phamViUyQuyen: "", ghiChu: "",
   });
 
   useEffect(() => {
@@ -98,85 +94,53 @@ export default function Delegation() {
           <p>Quản lý ủy quyền xử lý văn bản cho người khác.</p>
         </div>
         <div className="topbar__actions">
-          <button className="button secondary" type="button" onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Hủy" : "+ Tạo ủy quyền"}
+          <button className="button" type="button" onClick={() => { setShowForm(!showForm); setFormError(null); }}>
+            {showForm ? "Đóng form" : "+ Tạo ủy quyền"}
           </button>
         </div>
       </div>
 
-      {loading && (
-        <div className="card">
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
-        </div>
-      )}
-      {error && (
-        <div className="card">
-          <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>
-        </div>
-      )}
+      {error && <div className="alert alert--error" style={{ marginBottom: 16 }}>{error}</div>}
 
       {showForm && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Tạo ủy quyền mới</h3>
-          {formError && (
-            <div style={{ padding: 10, borderRadius: 6, background: "rgba(239,68,68,0.1)", color: "#ef4444", marginBottom: 12 }}>
-              {formError}
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ marginBottom: 16 }}>🤝 Tạo ủy quyền mới</h3>
+          {formError && <div className="alert alert--error" style={{ marginBottom: 14 }}>{formError}</div>}
+          <form onSubmit={handleCreate}>
+            <div className="form-section">
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="form-label">ID người được ủy quyền <span>*</span></label>
+                  <input type="number" className="form-control" placeholder="Nhập ID người dùng"
+                    value={form.nguoiDuocUyQuyenId} onChange={(e) => setForm({ ...form, nguoiDuocUyQuyenId: e.target.value })} />
+                </div>
+                <div className="form-field" />
+              </div>
+              <div className="form-row">
+                <div className="form-field">
+                  <label className="form-label">Từ ngày <span>*</span></label>
+                  <input type="date" className="form-control"
+                    value={form.tuNgay} onChange={(e) => setForm({ ...form, tuNgay: e.target.value })} />
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Đến ngày <span>*</span></label>
+                  <input type="date" className="form-control"
+                    value={form.denNgay} onChange={(e) => setForm({ ...form, denNgay: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-field">
+                <label className="form-label">Phạm vi ủy quyền</label>
+                <input type="text" className="form-control" placeholder="VD: Ký duyệt văn bản đến"
+                  value={form.phamViUyQuyen} onChange={(e) => setForm({ ...form, phamViUyQuyen: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Ghi chú</label>
+                <textarea className="form-control" rows={3}
+                  value={form.ghiChu} onChange={(e) => setForm({ ...form, ghiChu: e.target.value })} />
+              </div>
             </div>
-          )}
-
-          <form className="form-grid" style={{ gap: 12 }} onSubmit={handleCreate}>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <label style={{ flex: 1, minWidth: 160 }}>
-                ID người được ủy quyền <span style={{ color: "#ef4444" }}>*</span>
-                <input
-                  type="number"
-                  placeholder="Nhập ID người dùng"
-                  value={form.nguoiDuocUyQuyenId}
-                  onChange={(e) => setForm({ ...form, nguoiDuocUyQuyenId: e.target.value })}
-                />
-              </label>
-              <label style={{ flex: 1, minWidth: 140 }}>
-                Từ ngày <span style={{ color: "#ef4444" }}>*</span>
-                <input
-                  type="date"
-                  value={form.tuNgay}
-                  onChange={(e) => setForm({ ...form, tuNgay: e.target.value })}
-                />
-              </label>
-              <label style={{ flex: 1, minWidth: 140 }}>
-                Đến ngày <span style={{ color: "#ef4444" }}>*</span>
-                <input
-                  type="date"
-                  value={form.denNgay}
-                  onChange={(e) => setForm({ ...form, denNgay: e.target.value })}
-                />
-              </label>
-            </div>
-
-            <label>
-              Phạm vi ủy quyền
-              <input
-                type="text"
-                placeholder="VD: Ký duyệt văn bản đến"
-                value={form.phamViUyQuyen}
-                onChange={(e) => setForm({ ...form, phamViUyQuyen: e.target.value })}
-              />
-            </label>
-
-            <label>
-              Ghi chú
-              <textarea
-                rows={3}
-                value={form.ghiChu}
-                onChange={(e) => setForm({ ...form, ghiChu: e.target.value })}
-                style={{ width: "100%", resize: "vertical" }}
-              />
-            </label>
-
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-              <button type="button" className="button secondary" onClick={() => setShowForm(false)}>
-                Hủy
-              </button>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <button type="button" className="button secondary" onClick={() => setShowForm(false)}>Hủy</button>
               <button type="submit" className="button" disabled={submitting}>
                 {submitting ? "Đang tạo..." : "Tạo ủy quyền"}
               </button>
@@ -186,27 +150,35 @@ export default function Delegation() {
       )}
 
       <div className="card">
+        {loading && (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tải...</p>
+          </div>
+        )}
         {!loading && items.length === 0 && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>
-            Chưa có ủy quyền nào.
-          </p>
+          <div className="empty-state">
+            <div className="empty-state__icon">🤝</div>
+            <h3>Chưa có ủy quyền nào</h3>
+            <p>Tạo ủy quyền mới để phân công xử lý văn bản.</p>
+          </div>
         )}
         {items.length > 0 && (
-          <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="table">
             <thead>
               <tr>
-                <th style={{ whiteSpace: "nowrap" }}>ID</th>
-                <th style={{ whiteSpace: "nowrap" }}>Người được ủy quyền (ID)</th>
-                <th style={{ whiteSpace: "nowrap" }}>Từ ngày</th>
-                <th style={{ whiteSpace: "nowrap" }}>Đến ngày</th>
+                <th>ID</th>
+                <th>Người được ủy quyền</th>
+                <th>Từ ngày</th>
+                <th>Đến ngày</th>
                 <th>Phạm vi</th>
-                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
-                <th style={{ width: 80 }}></th>
+                <th>Trạng thái</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} style={{ verticalAlign: "middle" }}>
+                <tr key={item.id}>
                   <td style={{ fontWeight: 600 }}>{item.id}</td>
                   <td>{item.nguoiDuocUyQuyenId}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{formatDate(item.tuNgay)}</td>
@@ -219,12 +191,7 @@ export default function Delegation() {
                   </td>
                   <td style={{ textAlign: "center" }}>
                     {item.active && (
-                      <button
-                        className="button secondary"
-                        type="button"
-                        onClick={() => handleCancel(item.id)}
-                        style={{ fontSize: 12, padding: "2px 8px", color: "#ef4444" }}
-                      >
+                      <button className="btn-xs btn-xs--reject" type="button" onClick={() => handleCancel(item.id)}>
                         Hủy
                       </button>
                     )}

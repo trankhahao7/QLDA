@@ -173,11 +173,7 @@ export default function Reports() {
           <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
         </div>
       )}
-      {error && (
-        <div className="card">
-          <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>
-        </div>
-      )}
+      {error && <div className="admin-error">⚠️ {error}</div>}
 
       {!loading && stats && (
         <>

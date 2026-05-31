@@ -134,11 +134,16 @@ export default function AdminDashboard() {
   }, []);
 
   if (loading) {
-    return <div className="admin-loading">Đang tải dữ liệu...</div>;
+    return (
+      <div className="admin-loading">
+        <div className="admin-spinner" />
+        <span>Đang tải dữ liệu thống kê...</span>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="admin-loading">{error}</div>;
+    return <div className="admin-error">⚠️ {error}</div>;
   }
 
   return (
@@ -182,7 +187,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="admin-section">
-        <h2>Hoạt động gần đây</h2>
+        <div className="section-header"><h2>📋 Hoạt động gần đây</h2></div>
         <table className="admin-table">
           <thead>
             <tr>
@@ -212,7 +217,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="admin-section">
-        <h2>Thống kê xử lý văn bản theo trạng thái</h2>
+        <div className="section-header"><h2>📊 Thống kê theo trạng thái</h2></div>
         <div className="status-stats">
           {Object.entries(statusStats).map(([key, value]) => (
             <div key={key} className="status-item">

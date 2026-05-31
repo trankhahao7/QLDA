@@ -15,15 +15,15 @@ function decodeJwtRoles(token: string): string[] {
 }
 
 const navItems = [
-  { to: "/dashboard", label: "Tổng quan" },
-  { to: "/inbox", label: "Văn bản đến" },
-  { to: "/outgoing", label: "Văn bản đi" },
-  { to: "/approvals", label: "Phê duyệt" },
-  { to: "/case-files", label: "Hồ sơ công việc" },
-  { to: "/delegation", label: "Ủy quyền xử lý" },
-  { to: "/upload", label: "Tải lên" },
-  { to: "/search", label: "Tìm kiếm" },
-  { to: "/profile", label: "Tài khoản" },
+  { to: "/dashboard", label: "Tổng quan", icon: "🏠" },
+  { to: "/inbox", label: "Văn bản đến", icon: "📥" },
+  { to: "/outgoing", label: "Văn bản đi", icon: "📤" },
+  { to: "/approvals", label: "Phê duyệt", icon: "✅" },
+  { to: "/case-files", label: "Hồ sơ công việc", icon: "🗂️" },
+  { to: "/delegation", label: "Ủy quyền xử lý", icon: "🤝" },
+  { to: "/upload", label: "Tải lên", icon: "⬆️" },
+  { to: "/search", label: "Tìm kiếm", icon: "🔍" },
+  { to: "/profile", label: "Tài khoản", icon: "👤" },
 ];
 
 export default function Sidebar() {
@@ -53,19 +53,24 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
-        <h2>eOffice Intelligence System (eOIS)</h2>
-        <span>Hệ thống xử lý văn bản</span>
+        <div className="sidebar__brand-icon">📋</div>
+        <div className="sidebar__brand-text">
+          <h2>eOIS</h2>
+          <span>Hệ thống xử lý văn bản</span>
+        </div>
       </div>
 
       <nav className="sidebar__nav">
+        <span className="sidebar__nav-section">Nghiệp vụ</span>
+
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
           >
-            <span>{item.label}</span>
-            <span aria-hidden>→</span>
+            <span className="nav-link__icon">{item.icon}</span>
+            <span className="nav-link__label">{item.label}</span>
           </NavLink>
         ))}
 
@@ -73,34 +78,27 @@ export default function Sidebar() {
           to="/notifications"
           className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}
         >
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            Thông báo
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                  background: "#ef4444", color: "#fff", borderRadius: "50%",
-                  width: 18, height: 18, fontSize: 10, fontWeight: 700,
-                }}
-              >
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </span>
-          <span aria-hidden>→</span>
+          <span className="nav-link__icon">🔔</span>
+          <span className="nav-link__label">Thông báo</span>
+          {unreadCount > 0 && (
+            <span className="nav-link__badge">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
         </NavLink>
 
         {isAdmin && (
           <>
             <div className="nav-divider" />
+            <span className="sidebar__nav-section">Quản trị</span>
             <NavLink
               to="/admin/dashboard"
               className={({ isActive }) =>
                 isActive ? "nav-link active admin-link" : "nav-link admin-link"
               }
             >
-              <span>⚙️ Admin</span>
-              <span aria-hidden>→</span>
+              <span className="nav-link__icon">⚙️</span>
+              <span className="nav-link__label">Quản trị hệ thống</span>
             </NavLink>
           </>
         )}
@@ -109,7 +107,7 @@ export default function Sidebar() {
       <div className="sidebar__card">
         <h3>Trạng thái kết nối</h3>
         <p>Đang đồng bộ Office 365. Cập nhật lúc 09:20.</p>
-        <button className="button secondary" type="button">
+        <button className="button secondary" type="button" style={{ fontSize: 12, padding: "6px 12px" }}>
           Xem lịch sử
         </button>
       </div>

@@ -102,13 +102,13 @@ export default function AuditLogs() {
 
   if (loading) {
     return (
-      <div className="admin-loading">Đang tải nhật ký hệ thống...</div>
+      <div className="admin-loading"><div className="admin-spinner" /><span>Đang tải nhật ký hệ thống...</span></div>
     );
   }
 
   if (error) {
     return (
-      <div className="admin-loading">{error}</div>
+      <div className="admin-loading">{error}</span></div>
     );
   }
 
@@ -131,7 +131,7 @@ export default function AuditLogs() {
         >
           📥 Xuất CSV
         </button>
-      </div>
+      </span></div>
 
       <div className="audit-filters">
         <input
@@ -175,7 +175,7 @@ export default function AuditLogs() {
           onChange={(e) => setDateTo(e.target.value)}
           className="filter-input"
         />
-      </div>
+      </span></div>
 
       <table className="audit-table">
         <thead>
@@ -212,7 +212,7 @@ export default function AuditLogs() {
 
       <div className="pagination">
         <p>Tổng: {filteredLogs.length} bản ghi</p>
-      </div>
-    </div>
+      </span></div>
+    </span></div>
   );
 }

@@ -28,6 +28,12 @@ function getTrangThaiBadge(trangThai?: number) {
   return TRANG_THAI_MAP[trangThai] ?? { label: "Không xác định", className: "badge badge--ghost" };
 }
 
+const ACTION_META = {
+  approve: { icon: "✅", title: "Phê duyệt văn bản", btnLabel: "Xác nhận phê duyệt", btnClass: "button" },
+  reject:  { icon: "🚫", title: "Từ chối văn bản",   btnLabel: "Xác nhận từ chối",    btnClass: "button danger" },
+  comment: { icon: "💬", title: "Ghi chú / Bổ sung",  btnLabel: "Gửi ghi chú",         btnClass: "button secondary" },
+};
+
 export default function Approvals() {
   const [items, setItems] = useState<PendingApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,18 +92,10 @@ export default function Approvals() {
           chuyenBuocTiepTheo: true,
         });
       } else if (actionType === "reject") {
-        if (!comment.trim()) {
-          setSubmitResult("Vui lòng nhập lý do từ chối");
-          setSubmitting(false);
-          return;
-        }
+        if (!comment.trim()) { setSubmitResult("Vui lòng nhập lý do từ chối"); setSubmitting(false); return; }
         await rejectProcessing(activeItem.processingId, { lyDoTuChoi: comment.trim() });
       } else {
-        if (!comment.trim()) {
-          setSubmitResult("Vui lòng nhập nội dung ghi chú");
-          setSubmitting(false);
-          return;
-        }
+        if (!comment.trim()) { setSubmitResult("Vui lòng nhập nội dung ghi chú"); setSubmitting(false); return; }
         await commentProcessing(activeItem.processingId, { noiDungGopY: comment.trim() });
       }
       setSubmitResult("success");
@@ -112,17 +110,7 @@ export default function Approvals() {
     }
   };
 
-  const modalTitle: Record<ActionType, string> = {
-    approve: "Phê duyệt văn bản",
-    reject: "Từ chối văn bản",
-    comment: "Ghi chú / Yêu cầu bổ sung",
-  };
-
-  const modalButtonLabel: Record<ActionType, string> = {
-    approve: "Xác nhận phê duyệt",
-    reject: "Xác nhận từ chối",
-    comment: "Gửi ghi chú",
-  };
+  const meta = ACTION_META[actionType];
 
   return (
     <section>
@@ -132,34 +120,39 @@ export default function Approvals() {
           <p>Danh sách văn bản chờ phê duyệt của bạn.</p>
         </div>
         <div className="topbar__actions">
-          <button className="button secondary" type="button" onClick={reload}>
-            Làm mới
-          </button>
+          <button className="button secondary" type="button" onClick={reload}>🔄 Làm mới</button>
         </div>
       </div>
 
+      {error && <div className="alert alert--error" style={{ marginBottom: 16 }}>{error}</div>}
+
       <div className="card">
         {loading && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tải danh sách phê duyệt...</p>
+          </div>
         )}
-        {error && <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>}
+
         {!loading && !error && items.length === 0 && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>
-            Không có văn bản nào chờ phê duyệt.
-          </p>
+          <div className="empty-state">
+            <div className="empty-state__icon">✅</div>
+            <h3>Không có văn bản chờ phê duyệt</h3>
+            <p>Tất cả văn bản đã được xử lý.</p>
+          </div>
         )}
 
         {items.length > 0 && (
-          <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="table">
             <thead>
               <tr>
-                <th style={{ whiteSpace: "nowrap" }}>Mã</th>
+                <th>Mã</th>
                 <th>Nội dung</th>
-                <th style={{ whiteSpace: "nowrap" }}>Người gửi</th>
-                <th style={{ whiteSpace: "nowrap" }}>Ngày nhận</th>
-                <th style={{ whiteSpace: "nowrap" }}>Hạn xử lý</th>
-                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
-                <th style={{ textAlign: "center", width: 220, whiteSpace: "nowrap" }}>Thao tác</th>
+                <th>Người gửi</th>
+                <th>Ngày nhận</th>
+                <th>Hạn xử lý</th>
+                <th>Trạng thái</th>
+                <th style={{ textAlign: "center" }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -167,59 +160,34 @@ export default function Approvals() {
                 const isOverdue = item.hanXuLy && new Date(item.hanXuLy) < new Date();
                 const badge = getTrangThaiBadge(item.trangThaiXuLy);
                 return (
-                  <tr key={item.processingId} style={{ verticalAlign: "middle" }}>
-                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {item.soKyHieu || "-"}
-                    </td>
+                  <tr key={item.processingId}>
+                    <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu || "-"}</td>
                     <td>
-                      <Link to={`/documents/${item.documentId}`}>{item.trichYeu}</Link>
+                      <Link to={`/documents/${item.documentId}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                        {item.trichYeu}
+                      </Link>
                     </td>
+                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.nguoiGuiTen || "-"}</td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-                      {item.nguoiGuiTen || "-"}
-                    </td>
-                    <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-                      {item.ngayNhan
-                        ? new Date(item.ngayNhan).toLocaleDateString("vi-VN")
-                        : "-"}
+                      {item.ngayNhan ? new Date(item.ngayNhan).toLocaleDateString("vi-VN") : "-"}
                     </td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>
                       {item.hanXuLy ? (
-                        <span style={{ color: isOverdue ? "#ef4444" : undefined }}>
+                        <span style={{ color: isOverdue ? "var(--danger)" : undefined }}>
                           {new Date(item.hanXuLy).toLocaleDateString("vi-VN")}
                           {isOverdue && " ⚠"}
                         </span>
-                      ) : (
-                        "-"
-                      )}
+                      ) : "-"}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <span className={badge.className}>{badge.label}</span>
                     </td>
-                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button
-                        className="button button--small"
-                        type="button"
-                        onClick={() => openModal(item, "approve")}
-                        style={{ fontSize: 12, padding: "2px 8px", marginRight: 4, background: "#22c55e", color: "#fff", border: "none" }}
-                      >
-                        Duyệt
-                      </button>
-                      <button
-                        className="button button--small"
-                        type="button"
-                        onClick={() => openModal(item, "reject")}
-                        style={{ fontSize: 12, padding: "2px 8px", marginRight: 4, background: "#ef4444", color: "#fff", border: "none" }}
-                      >
-                        Từ chối
-                      </button>
-                      <button
-                        className="button button--small secondary"
-                        type="button"
-                        onClick={() => openModal(item, "comment")}
-                        style={{ fontSize: 12, padding: "2px 8px" }}
-                      >
-                        Ghi chú
-                      </button>
+                    <td style={{ textAlign: "center" }}>
+                      <div className="action-group">
+                        <button className="btn-xs btn-xs--approve" type="button" onClick={() => openModal(item, "approve")}>Duyệt</button>
+                        <button className="btn-xs btn-xs--reject" type="button" onClick={() => openModal(item, "reject")}>Từ chối</button>
+                        <button className="btn-xs btn-xs--ghost" type="button" onClick={() => openModal(item, "comment")}>Ghi chú</button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -230,69 +198,47 @@ export default function Approvals() {
       </div>
 
       {showModal && activeItem && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000, display: "flex",
-            alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.4)",
-          }}
-          onClick={closeModal}
-        >
-          <div
-            style={{
-              background: "#fff", borderRadius: 12, padding: 28, width: 480,
-              maxWidth: "90vw", boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>{modalTitle[actionType]}</h3>
-
-            <div style={{ marginBottom: 16, padding: 12, background: "#f8f9fa", borderRadius: 8, fontSize: 13 }}>
-              <strong>Văn bản:</strong> {activeItem.soKyHieu || `#${activeItem.documentId}`} — {activeItem.trichYeu}
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{meta.icon} {meta.title}</h3>
+              <button className="modal-close" onClick={closeModal}>✕</button>
             </div>
+            <div className="modal-body">
+              <div className="modal-doc-ref">
+                <strong>{activeItem.soKyHieu || `#${activeItem.documentId}`}</strong> — {activeItem.trichYeu}
+              </div>
 
-            <div className="form-grid" style={{ gap: 12 }}>
-              <label>
-                {actionType === "approve" ? "Ý kiến (tùy chọn)" : actionType === "reject" ? "Lý do từ chối *" : "Nội dung ghi chú *"}
+              <div className="form-field">
+                <label className="form-label">
+                  {actionType === "approve" ? "Ý kiến (tùy chọn)" : actionType === "reject" ? "Lý do từ chối *" : "Nội dung ghi chú *"}
+                </label>
                 <textarea
+                  className="form-control"
                   rows={4}
                   placeholder={
-                    actionType === "approve"
-                      ? "Nhập ý kiến nếu có..."
-                      : actionType === "reject"
-                      ? "Nhập lý do từ chối..."
-                      : "Nhập nội dung yêu cầu bổ sung..."
+                    actionType === "approve" ? "Nhập ý kiến nếu có..."
+                    : actionType === "reject" ? "Nhập lý do từ chối..."
+                    : "Nhập nội dung yêu cầu bổ sung..."
                   }
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  style={{ width: "100%", resize: "vertical" }}
                 />
-              </label>
-
-              {submitResult === "success" && (
-                <div style={{ padding: 10, borderRadius: 6, background: "rgba(34,197,94,0.1)", color: "#22c55e", textAlign: "center" }}>
-                  Thành công!
-                </div>
-              )}
-              {submitResult && submitResult !== "success" && (
-                <div style={{ padding: 10, borderRadius: 6, background: "rgba(239,68,68,0.1)", color: "#ef4444", textAlign: "center" }}>
-                  {submitResult}
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-                <button className="button secondary" type="button" onClick={closeModal} disabled={submitting}>
-                  Hủy
-                </button>
-                <button
-                  className="button"
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  style={actionType === "reject" ? { background: "#ef4444" } : undefined}
-                >
-                  {submitting ? "Đang xử lý..." : modalButtonLabel[actionType]}
-                </button>
               </div>
+
+              {submitResult === "success" && <div className="alert alert--success">Thao tác thành công!</div>}
+              {submitResult && submitResult !== "success" && <div className="alert alert--error">{submitResult}</div>}
+            </div>
+            <div className="modal-footer">
+              <button className="button secondary" type="button" onClick={closeModal} disabled={submitting}>Hủy</button>
+              <button
+                className={meta.btnClass}
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting ? "Đang xử lý..." : meta.btnLabel}
+              </button>
             </div>
           </div>
         </div>

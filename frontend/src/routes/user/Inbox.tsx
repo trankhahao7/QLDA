@@ -187,7 +187,7 @@ export default function Inbox() {
       getTrangThaiBadge(d.trangThai).label,
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -205,36 +205,52 @@ export default function Inbox() {
         </div>
         <div className="topbar__actions">
           <button className="button" type="button" onClick={handleBatchTransfer} disabled={selectedIds.size === 0}>
-            Luân chuyển ({selectedIds.size})
+            📤 Luân chuyển ({selectedIds.size})
           </button>
           <button className="button secondary" type="button" onClick={exportCsv}>
-            Xuất báo cáo
+            Xuất CSV
           </button>
         </div>
       </div>
 
+      {error && (
+        <div className="alert alert--error" style={{ marginBottom: 16 }}>
+          <div className="alert__title">Lỗi</div>
+          {error}
+        </div>
+      )}
+
       <div className="card">
-        {loading && <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Đang tải...</p>}
-        {error && <p style={{ padding: 16, color: "#ef4444" }}>{error}</p>}
+        {loading && (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Đang tải văn bản đến...</p>
+          </div>
+        )}
+
         {!loading && !error && documents.length === 0 && (
-          <p style={{ padding: 16, textAlign: "center", color: "var(--text-muted)" }}>Chưa có văn bản đến.</p>
+          <div className="empty-state">
+            <div className="empty-state__icon">📭</div>
+            <h3>Chưa có văn bản đến</h3>
+            <p>Tất cả văn bản đến sẽ xuất hiện tại đây.</p>
+          </div>
         )}
 
         {documents.length > 0 && (
-          <table className="table" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="table">
             <thead>
               <tr>
                 <th style={{ width: 40, textAlign: "center" }}>
                   <input type="checkbox" onChange={toggleSelectAll} checked={selectedIds.size === documents.length && documents.length > 0} />
                 </th>
-                <th style={{ whiteSpace: "nowrap" }}>Mã</th>
-                <th style={{ whiteSpace: "nowrap" }}>Loại</th>
+                <th>Mã</th>
+                <th>Loại</th>
                 <th>Nội dung</th>
-                <th style={{ whiteSpace: "nowrap" }}>Nơi gửi</th>
-                <th style={{ whiteSpace: "nowrap" }}>Ngày</th>
-                <th style={{ whiteSpace: "nowrap" }}>Ưu tiên</th>
-                <th style={{ whiteSpace: "nowrap" }}>Trạng thái</th>
-                <th style={{ width: 180, textAlign: "center" }}>Thao tác</th>
+                <th>Nơi gửi</th>
+                <th>Ngày</th>
+                <th>Ưu tiên</th>
+                <th>Trạng thái</th>
+                <th style={{ textAlign: "center" }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -245,53 +261,38 @@ export default function Inbox() {
                 return (
                   <tr
                     key={item.id}
-                    style={{
-                      background: selectedIds.has(item.id) ? "rgba(59,130,246,0.05)" : undefined,
-                      verticalAlign: "middle",
-                    }}
+                    style={{ background: selectedIds.has(item.id) ? "rgba(15,118,110,0.04)" : undefined }}
                   >
                     <td style={{ textAlign: "center" }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                      />
+                      <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
                     </td>
                     <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{item.soKyHieu}</td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.tenLoaiVanBan || "-"}</td>
                     <td>
-                      <Link to={`/documents/${item.id}`}>{item.trichYeu}</Link>
+                      <Link to={`/documents/${item.id}`} style={{ color: "var(--accent-strong)", fontWeight: 500 }}>
+                        {item.trichYeu}
+                      </Link>
                     </td>
                     <td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{item.donViBanHanh}</td>
                     <td style={{ whiteSpace: "nowrap", fontSize: 13 }}>
                       {item.ngayTiepNhan ? new Date(item.ngayTiepNhan).toLocaleDateString("vi-VN") : "-"}
-                      {isOverdue && <span style={{ marginLeft: 4, color: "#ef4444", fontSize: 11 }}>⚠</span>}
+                      {isOverdue && <span style={{ marginLeft: 4, color: "var(--danger)", fontSize: 11 }}>⚠</span>}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
-                      {khan ? <span className={khan.className}>{khan.label}</span> : <span className="badge badge--ghost">-</span>}
+                      {khan ? <span className={khan.className}>{khan.label}</span> : <span className="badge badge--ghost">—</span>}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <span className={stt.className}>{stt.label}</span>
                     </td>
-                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                      <button
-                        className="button button--small"
-                        type="button"
-                        onClick={() => handleSelfProcess(item)}
-                        title="Tự xử lý"
-                        style={{ fontSize: 12, padding: "2px 8px", marginRight: 4 }}
-                      >
-                        Tự xử lý
-                      </button>
-                      <button
-                        className="button button--small"
-                        type="button"
-                        onClick={() => openTransfer(item)}
-                        title="Luân chuyển"
-                        style={{ fontSize: 12, padding: "2px 8px" }}
-                      >
-                        Luân chuyển
-                      </button>
+                    <td style={{ textAlign: "center" }}>
+                      <div className="action-group">
+                        <button className="btn-xs btn-xs--primary" type="button" onClick={() => handleSelfProcess(item)}>
+                          Tự xử lý
+                        </button>
+                        <button className="btn-xs btn-xs--ghost" type="button" onClick={() => openTransfer(item)}>
+                          Luân chuyển
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -302,92 +303,80 @@ export default function Inbox() {
       </div>
 
       {showTransfer && transferDoc && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.4)",
-          }}
-          onClick={closeTransfer}
-        >
-          <div
-            style={{
-              background: "#fff", borderRadius: 12, padding: 28, width: 500, maxWidth: "90vw",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Luân chuyển văn bản</h3>
-
-            <div style={{ marginBottom: 16, padding: 12, background: "#f8f9fa", borderRadius: 8, fontSize: 13 }}>
-              <strong>Văn bản:</strong> {transferDoc.soKyHieu} — {transferDoc.trichYeu}
+        <div className="modal-overlay" onClick={closeTransfer}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📤 Luân chuyển văn bản</h3>
+              <button className="modal-close" onClick={closeTransfer}>✕</button>
             </div>
+            <div className="modal-body">
+              <div className="modal-doc-ref">
+                <strong>{transferDoc.soKyHieu}</strong> — {transferDoc.trichYeu}
+              </div>
 
-            <div className="form-grid" style={{ gap: 12 }}>
-              <label>
-                Người nhận xử lý <span style={{ color: "#ef4444" }}>*</span>
-                <select
-                  value={transferForm.nguoiNhanId}
-                  onChange={(e) => setTransferForm({ ...transferForm, nguoiNhanId: e.target.value })}
-                >
-                  <option value="">-- Chọn người nhận --</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.hoTen} ({u.tenDonVi || "—"})</option>
-                  ))}
-                </select>
-              </label>
+              <div className="form-section">
+                <div className="form-field">
+                  <label className="form-label">Người nhận xử lý <span>*</span></label>
+                  <select
+                    className="form-control"
+                    value={transferForm.nguoiNhanId}
+                    onChange={(e) => setTransferForm({ ...transferForm, nguoiNhanId: e.target.value })}
+                  >
+                    <option value="">-- Chọn người nhận --</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.hoTen} ({u.tenDonVi || "—"})</option>
+                    ))}
+                  </select>
+                </div>
 
-              <label>
-                Đơn vị xử lý
-                <select
-                  value={transferForm.donViXuLyId}
-                  onChange={(e) => setTransferForm({ ...transferForm, donViXuLyId: e.target.value })}
-                >
-                  <option value="">-- Chọn đơn vị --</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>{u.tenDonVi}</option>
-                  ))}
-                </select>
-              </label>
+                <div className="form-field">
+                  <label className="form-label">Đơn vị xử lý</label>
+                  <select
+                    className="form-control"
+                    value={transferForm.donViXuLyId}
+                    onChange={(e) => setTransferForm({ ...transferForm, donViXuLyId: e.target.value })}
+                  >
+                    <option value="">-- Chọn đơn vị --</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.id}>{u.tenDonVi}</option>
+                    ))}
+                  </select>
+                </div>
 
-              <label>
-                Nội dung chuyển
-                <textarea
-                  rows={3}
-                  placeholder="Ghi chú nội dung chuyển xử lý..."
-                  value={transferForm.noiDungChuyen}
-                  onChange={(e) => setTransferForm({ ...transferForm, noiDungChuyen: e.target.value })}
-                  style={{ width: "100%", resize: "vertical" }}
-                />
-              </label>
+                <div className="form-field">
+                  <label className="form-label">Nội dung chuyển</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    placeholder="Ghi chú nội dung chuyển xử lý..."
+                    value={transferForm.noiDungChuyen}
+                    onChange={(e) => setTransferForm({ ...transferForm, noiDungChuyen: e.target.value })}
+                  />
+                </div>
 
-              <label>
-                Hạn xử lý
-                <input
-                  type="date"
-                  value={transferForm.hanXuLy}
-                  onChange={(e) => setTransferForm({ ...transferForm, hanXuLy: e.target.value })}
-                />
-              </label>
+                <div className="form-field">
+                  <label className="form-label">Hạn xử lý</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={transferForm.hanXuLy}
+                    onChange={(e) => setTransferForm({ ...transferForm, hanXuLy: e.target.value })}
+                  />
+                </div>
+              </div>
 
               {transferResult === "success" && (
-                <div style={{ padding: 10, borderRadius: 6, background: "rgba(34,197,94,0.1)", color: "#22c55e", textAlign: "center" }}>
-                  Luân chuyển thành công!
-                </div>
+                <div className="alert alert--success">Luân chuyển thành công!</div>
               )}
               {transferResult && transferResult !== "success" && (
-                <div style={{ padding: 10, borderRadius: 6, background: "rgba(239,68,68,0.1)", color: "#ef4444", textAlign: "center" }}>
-                  {transferResult}
-                </div>
+                <div className="alert alert--error">{transferResult}</div>
               )}
-
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-                <button className="button secondary" type="button" onClick={closeTransfer} disabled={transferSubmitting}>
-                  Hủy
-                </button>
-                <button className="button" type="button" onClick={handleTransfer} disabled={transferSubmitting}>
-                  {transferSubmitting ? "Đang xử lý..." : "Xác nhận luân chuyển"}
-                </button>
-              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="button secondary" type="button" onClick={closeTransfer} disabled={transferSubmitting}>Hủy</button>
+              <button className="button" type="button" onClick={handleTransfer} disabled={transferSubmitting}>
+                {transferSubmitting ? "Đang xử lý..." : "Xác nhận luân chuyển"}
+              </button>
             </div>
           </div>
         </div>
